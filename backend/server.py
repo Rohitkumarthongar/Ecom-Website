@@ -125,6 +125,9 @@ class OrderCreate(BaseModel):
     payment_method: str = "cod"  # cod, phonepe, paytm, upi, card
     is_offline: bool = False
     customer_phone: Optional[str] = None
+    apply_gst: bool = True  # Option to include GST or not
+    discount_amount: float = 0  # Manual discount
+    discount_percentage: float = 0  # Percentage discount
 
 class OrderStatusUpdate(BaseModel):
     status: str
