@@ -50,6 +50,18 @@ class UserCreate(BaseModel):
     email: Optional[str] = None
     gst_number: Optional[str] = None
     password: str
+    request_seller: bool = False  # User requesting seller upgrade
+
+class UserAddressUpdate(BaseModel):
+    addresses: List[Dict[str, str]]
+
+class SellerRequest(BaseModel):
+    user_id: str
+    business_name: Optional[str] = None
+    gst_number: Optional[str] = None
+
+class PincodeVerify(BaseModel):
+    pincode: str
 
 class UserLogin(BaseModel):
     phone: str
