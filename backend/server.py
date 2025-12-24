@@ -344,7 +344,7 @@ async def get_me(user: dict = Depends(get_current_user)):
 
 @api_router.put("/auth/profile")
 async def update_profile(data: dict, user: dict = Depends(get_current_user)):
-    allowed_fields = ["name", "email", "address"]
+    allowed_fields = ["name", "email", "address", "addresses"]
     update_data = {k: v for k, v in data.items() if k in allowed_fields}
     
     if update_data:
@@ -352,6 +352,147 @@ async def update_profile(data: dict, user: dict = Depends(get_current_user)):
     
     updated_user = await db.users.find_one({"id": user["id"]}, {"_id": 0, "password": 0})
     return updated_user
+
+# ============ SELLER REQUEST ROUTES ============
+
+@api_router.post("/auth/request-seller")
+async def request_seller_upgrade(data: SellerRequest, user: dict = Depends(get_current_user)):
+    """User requests to become a seller to access wholesale prices"""
+    request_doc = {
+        "id": generate_id(),
+        "user_id": user["id"],
+        "user_name": user["name"],
+        "user_phone": user["phone"],
+        "business_name": data.business_name,
+        "gst_number": data.gst_number,
+        "status": "pending",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.seller_requests.insert_one(request_doc)
+    
+    # Create notification for admin
+    notification_doc = {
+        "id": generate_id(),
+        "type": "seller_request",
+        "title": "New Seller Request",
+        "message": f"{user['name']} has requested seller access",
+        "data": {"request_id": request_doc["id"], "user_id": user["id"]},
+        "for_admin": True,
+        "read": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.notifications.insert_one(notification_doc)
+    
+    request_doc.pop("_id", None)
+    return {"message": "Seller request submitted", "request": request_doc}
+
+@api_router.get("/admin/seller-requests")
+async def get_seller_requests(status: Optional[str] = None, admin: dict = Depends(admin_required)):
+    query = {}
+    if status:
+        query["status"] = status
+    requests = await db.seller_requests.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return requests
+
+@api_router.put("/admin/seller-requests/{request_id}")
+async def handle_seller_request(request_id: str, data: dict, admin: dict = Depends(admin_required)):
+    request = await db.seller_requests.find_one({"id": request_id}, {"_id": 0})
+    if not request:
+        raise HTTPException(status_code=404, detail="Request not found")
+    
+    status = data.get("status", "approved")
+    await db.seller_requests.update_one({"id": request_id}, {"$set": {"status": status}})
+    
+    if status == "approved":
+        # Upgrade user to seller
+        await db.users.update_one(
+            {"id": request["user_id"]},
+            {"$set": {"is_seller": True, "is_wholesale": True, "gst_number": request.get("gst_number")}}
+        )
+        
+        # Notify user
+        notification_doc = {
+            "id": generate_id(),
+            "type": "seller_approved",
+            "title": "Seller Request Approved!",
+            "message": "Congratulations! Your seller request has been approved. You can now access wholesale prices.",
+            "user_id": request["user_id"],
+            "for_admin": False,
+            "read": False,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.notifications.insert_one(notification_doc)
+    
+    return {"message": f"Request {status}"}
+
+# ============ NOTIFICATION ROUTES ============
+
+@api_router.get("/notifications")
+async def get_user_notifications(user: dict = Depends(get_current_user)):
+    notifications = await db.notifications.find(
+        {"user_id": user["id"], "for_admin": False},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(50).to_list(50)
+    unread_count = await db.notifications.count_documents({"user_id": user["id"], "read": False, "for_admin": False})
+    return {"notifications": notifications, "unread_count": unread_count}
+
+@api_router.put("/notifications/{notification_id}/read")
+async def mark_notification_read(notification_id: str, user: dict = Depends(get_current_user)):
+    await db.notifications.update_one({"id": notification_id}, {"$set": {"read": True}})
+    return {"message": "Notification marked as read"}
+
+@api_router.put("/notifications/mark-all-read")
+async def mark_all_read(user: dict = Depends(get_current_user)):
+    await db.notifications.update_many({"user_id": user["id"]}, {"$set": {"read": True}})
+    return {"message": "All notifications marked as read"}
+
+@api_router.get("/admin/notifications")
+async def get_admin_notifications(admin: dict = Depends(admin_required)):
+    notifications = await db.notifications.find(
+        {"for_admin": True},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(50).to_list(50)
+    unread_count = await db.notifications.count_documents({"for_admin": True, "read": False})
+    return {"notifications": notifications, "unread_count": unread_count}
+
+@api_router.put("/admin/notifications/{notification_id}/read")
+async def mark_admin_notification_read(notification_id: str, admin: dict = Depends(admin_required)):
+    await db.notifications.update_one({"id": notification_id}, {"$set": {"read": True}})
+    return {"message": "Notification marked as read"}
+
+# ============ PINCODE VERIFICATION ============
+
+@api_router.post("/verify-pincode")
+async def verify_pincode(data: PincodeVerify):
+    """Verify pincode and return area details"""
+    pincode = data.pincode
+    if not pincode or len(pincode) != 6 or not pincode.isdigit():
+        raise HTTPException(status_code=400, detail="Invalid pincode format")
+    
+    # Check if pincode is serviceable (mock data - in production, use actual API)
+    # Indian pincode ranges
+    first_digit = int(pincode[0])
+    regions = {
+        1: "Delhi/Haryana/Punjab/HP/J&K",
+        2: "UP/Uttarakhand", 
+        3: "Rajasthan/Gujarat",
+        4: "Maharashtra/Goa/MP/Chhattisgarh",
+        5: "Andhra/Telangana/Karnataka",
+        6: "Tamil Nadu/Kerala",
+        7: "West Bengal/Odisha/NE States",
+        8: "Bihar/Jharkhand"
+    }
+    
+    if first_digit in regions:
+        return {
+            "valid": True,
+            "pincode": pincode,
+            "region": regions[first_digit],
+            "serviceable": True,
+            "estimated_delivery": "3-5 business days"
+        }
+    
+    return {"valid": False, "pincode": pincode, "serviceable": False}
 
 # ============ CATEGORY ROUTES ============
 
