@@ -710,13 +710,19 @@ async def create_order(data: OrderCreate, user: Optional[dict] = None):
         if product["stock_qty"] < item.quantity:
             raise HTTPException(status_code=400, detail=f"Insufficient stock for {product['name']}")
         
-        # Determine price based on user type and quantity
+        # Determine price based on user type (seller/wholesale) and quantity
         price = product["selling_price"]
-        if user and user.get("is_wholesale") and item.quantity >= product.get("wholesale_min_qty", 10):
+        is_wholesale_price = False
+        if user and (user.get("is_wholesale") or user.get("is_seller")) and item.quantity >= product.get("wholesale_min_qty", 10):
             price = product.get("wholesale_price", product["selling_price"])
+            is_wholesale_price = True
         
         item_total = price * item.quantity
-        gst_amount = item_total * (product.get("gst_rate", 18) / 100)
+        
+        # Calculate GST only if apply_gst is True
+        gst_amount = 0
+        if data.apply_gst:
+            gst_amount = item_total * (product.get("gst_rate", 18) / 100)
         
         items_with_details.append({
             "product_id": item.product_id,
@@ -725,9 +731,11 @@ async def create_order(data: OrderCreate, user: Optional[dict] = None):
             "quantity": item.quantity,
             "price": price,
             "mrp": product["mrp"],
-            "gst_rate": product.get("gst_rate", 18),
+            "gst_rate": product.get("gst_rate", 18) if data.apply_gst else 0,
             "gst_amount": gst_amount,
-            "total": item_total + gst_amount
+            "total": item_total + gst_amount,
+            "is_wholesale_price": is_wholesale_price,
+            "image_url": product.get("images", [None])[0]
         })
         subtotal += item_total
         
@@ -737,8 +745,16 @@ async def create_order(data: OrderCreate, user: Optional[dict] = None):
             {"$inc": {"stock_qty": -item.quantity}}
         )
     
-    total_gst = sum(i["gst_amount"] for i in items_with_details)
-    grand_total = subtotal + total_gst
+    total_gst = sum(i["gst_amount"] for i in items_with_details) if data.apply_gst else 0
+    
+    # Apply discounts
+    discount = 0
+    if data.discount_amount > 0:
+        discount = data.discount_amount
+    elif data.discount_percentage > 0:
+        discount = subtotal * (data.discount_percentage / 100)
+    
+    grand_total = subtotal + total_gst - discount
     
     order_doc = {
         "id": generate_id(),
@@ -747,7 +763,9 @@ async def create_order(data: OrderCreate, user: Optional[dict] = None):
         "customer_phone": data.customer_phone or (user["phone"] if user else None),
         "items": items_with_details,
         "subtotal": subtotal,
+        "gst_applied": data.apply_gst,
         "gst_total": total_gst,
+        "discount_amount": discount,
         "grand_total": grand_total,
         "shipping_address": data.shipping_address,
         "payment_method": data.payment_method,
@@ -756,6 +774,7 @@ async def create_order(data: OrderCreate, user: Optional[dict] = None):
         "is_offline": data.is_offline,
         "tracking_number": None,
         "courier_provider": None,
+        "tracking_history": [{"status": "pending", "timestamp": datetime.now(timezone.utc).isoformat(), "note": "Order placed"}],
         "notes": [],
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat()
@@ -763,6 +782,21 @@ async def create_order(data: OrderCreate, user: Optional[dict] = None):
     
     await db.orders.insert_one(order_doc)
     order_doc.pop("_id", None)
+    
+    # Create notification for user
+    if user:
+        notification_doc = {
+            "id": generate_id(),
+            "type": "order_placed",
+            "title": "Order Placed Successfully!",
+            "message": f"Your order #{order_doc['order_number']} has been placed.",
+            "user_id": user["id"],
+            "data": {"order_id": order_doc["id"]},
+            "for_admin": False,
+            "read": False,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.notifications.insert_one(notification_doc)
     
     return order_doc
 
