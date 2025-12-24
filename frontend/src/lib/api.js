@@ -127,6 +127,7 @@ export const paymentGatewaysAPI = {
 export const settingsAPI = {
   get: () => api.get('/admin/settings'),
   update: (data) => api.put('/admin/settings', data),
+  getPublic: () => api.get('/settings/public'),
 };
 
 // Reports API
@@ -148,6 +149,52 @@ export const pagesAPI = {
   getContact: () => api.get('/pages/contact'),
   submitContact: (data) => api.post('/contact', data),
   updatePage: (slug, data) => api.put(`/admin/pages/${slug}`, data),
+};
+
+// Notifications API
+export const notificationsAPI = {
+  getUser: () => api.get('/notifications'),
+  markRead: (id) => api.put(`/notifications/${id}/read`),
+  markAllRead: () => api.put('/notifications/mark-all-read'),
+  getAdmin: () => api.get('/admin/notifications'),
+  markAdminRead: (id) => api.put(`/admin/notifications/${id}/read`),
+};
+
+// Seller Requests API
+export const sellerRequestsAPI = {
+  request: (data) => api.post('/auth/request-seller', data),
+  getAll: (params) => api.get('/admin/seller-requests', { params }),
+  update: (id, data) => api.put(`/admin/seller-requests/${id}`, data),
+};
+
+// Customers API
+export const customersAPI = {
+  getAll: (params) => api.get('/admin/customers', { params }),
+  getOne: (id) => api.get(`/admin/customers/${id}`),
+  update: (id, data) => api.put(`/admin/customers/${id}`, data),
+};
+
+// Pincode API
+export const pincodeAPI = {
+  verify: (pincode) => api.post('/verify-pincode', { pincode }),
+};
+
+// Packing Slip & Labels API
+export const printAPI = {
+  getPackingSlip: (orderId) => api.get(`/admin/orders/${orderId}/packing-slip`),
+  getLabel: (orderId) => api.get(`/admin/orders/${orderId}/label`),
+  getBulkLabels: (date) => api.get('/admin/orders/bulk-labels', { params: { date } }),
+};
+
+// Payment QR API
+export const paymentAPI = {
+  getQR: (amount) => api.get('/payment/qr', { params: { amount } }),
+};
+
+// Product Lookup API
+export const productLookupAPI = {
+  bySku: (sku) => api.get('/products/lookup', { params: { sku } }),
+  byBarcode: (barcode) => api.get('/products/lookup', { params: { barcode } }),
 };
 
 export default api;
