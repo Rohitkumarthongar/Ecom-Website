@@ -612,27 +612,136 @@ async def delete_product(product_id: str, admin: dict = Depends(admin_required))
 @api_router.post("/admin/products/bulk-upload")
 async def bulk_upload_products(products: List[ProductCreate], admin: dict = Depends(admin_required)):
     created = 0
+    updated = 0
     errors = []
     
     for product in products:
         try:
             existing = await db.products.find_one({"sku": product.sku}, {"_id": 0})
             if existing:
-                errors.append(f"SKU {product.sku} already exists")
+                # Update existing product
+                await db.products.update_one(
+                    {"sku": product.sku},
+                    {"$set": {**product.model_dump(), "updated_at": datetime.now(timezone.utc).isoformat()}}
+                )
+                updated += 1
+            else:
+                # Create new product
+                product_doc = {
+                    "id": generate_id(),
+                    **product.model_dump(),
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "updated_at": datetime.now(timezone.utc).isoformat()
+                }
+                await db.products.insert_one(product_doc)
+                created += 1
+        except Exception as e:
+            errors.append(f"SKU {product.sku}: {str(e)}")
+    
+    return {"created": created, "updated": updated, "errors": errors}
+
+@api_router.post("/admin/inventory/bulk-update")
+async def bulk_update_inventory(updates: List[Dict[str, Any]], admin: dict = Depends(admin_required)):
+    """
+    Bulk update inventory. Each item should have:
+    - sku: Product SKU
+    - stock_qty: New stock quantity (optional)
+    - adjustment: Amount to add/subtract (optional)
+    - low_stock_threshold: New threshold (optional)
+    """
+    updated = 0
+    errors = []
+    
+    for item in updates:
+        try:
+            sku = item.get("sku")
+            if not sku:
+                errors.append("Missing SKU in item")
                 continue
             
-            product_doc = {
-                "id": generate_id(),
-                **product.model_dump(),
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "updated_at": datetime.now(timezone.utc).isoformat()
-            }
-            await db.products.insert_one(product_doc)
-            created += 1
+            product = await db.products.find_one({"sku": sku}, {"_id": 0})
+            if not product:
+                errors.append(f"SKU {sku} not found")
+                continue
+            
+            update_fields = {"updated_at": datetime.now(timezone.utc).isoformat()}
+            
+            if "stock_qty" in item:
+                update_fields["stock_qty"] = int(item["stock_qty"])
+            elif "adjustment" in item:
+                update_fields["stock_qty"] = product["stock_qty"] + int(item["adjustment"])
+            
+            if "low_stock_threshold" in item:
+                update_fields["low_stock_threshold"] = int(item["low_stock_threshold"])
+            
+            if "selling_price" in item:
+                update_fields["selling_price"] = float(item["selling_price"])
+            
+            if "wholesale_price" in item:
+                update_fields["wholesale_price"] = float(item["wholesale_price"])
+            
+            await db.products.update_one({"sku": sku}, {"$set": update_fields})
+            
+            # Log inventory movement
+            if "stock_qty" in item or "adjustment" in item:
+                log_doc = {
+                    "id": generate_id(),
+                    "product_id": product["id"],
+                    "sku": sku,
+                    "type": "bulk_update",
+                    "previous_qty": product["stock_qty"],
+                    "new_qty": update_fields.get("stock_qty", product["stock_qty"]),
+                    "notes": item.get("notes", "Bulk inventory update"),
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "created_by": admin["id"]
+                }
+                await db.inventory_logs.insert_one(log_doc)
+            
+            updated += 1
         except Exception as e:
-            errors.append(str(e))
+            errors.append(f"SKU {item.get('sku', 'unknown')}: {str(e)}")
     
-    return {"created": created, "errors": errors}
+    return {"updated": updated, "errors": errors}
+
+@api_router.get("/admin/inventory/export")
+async def export_inventory(admin: dict = Depends(admin_required)):
+    """Export inventory data for bulk editing"""
+    products = await db.products.find({}, {"_id": 0}).to_list(10000)
+    
+    export_data = [{
+        "sku": p["sku"],
+        "name": p["name"],
+        "category_id": p.get("category_id", ""),
+        "stock_qty": p["stock_qty"],
+        "low_stock_threshold": p.get("low_stock_threshold", 10),
+        "cost_price": p["cost_price"],
+        "selling_price": p["selling_price"],
+        "wholesale_price": p.get("wholesale_price", ""),
+        "mrp": p["mrp"],
+        "gst_rate": p.get("gst_rate", 18)
+    } for p in products]
+    
+    return {"products": export_data, "total": len(export_data)}
+
+@api_router.get("/admin/products/export")
+async def export_products(admin: dict = Depends(admin_required)):
+    """Export all products data"""
+    products = await db.products.find({}, {"_id": 0}).to_list(10000)
+    return {"products": products, "total": len(products)}
+
+@api_router.get("/admin/inventory/logs")
+async def get_inventory_logs(
+    product_id: Optional[str] = None,
+    limit: int = 100,
+    admin: dict = Depends(admin_required)
+):
+    """Get inventory change logs"""
+    query = {}
+    if product_id:
+        query["product_id"] = product_id
+    
+    logs = await db.inventory_logs.find(query, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
+    return logs
 
 # ============ INVENTORY ROUTES ============
 
