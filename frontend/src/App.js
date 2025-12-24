@@ -84,6 +84,11 @@ function AppContent() {
         <Route path="/login" element={<StoreRoutes><LoginPage /></StoreRoutes>} />
         <Route path="/register" element={<StoreRoutes><LoginPage /></StoreRoutes>} />
         <Route path="/checkout" element={<StoreRoutes><CheckoutPage /></StoreRoutes>} />
+        <Route path="/profile" element={
+          <ProtectedRoute>
+            <StoreRoutes><ProfilePage /></StoreRoutes>
+          </ProtectedRoute>
+        } />
         <Route path="/orders" element={
           <ProtectedRoute>
             <StoreRoutes><OrdersPage /></StoreRoutes>
