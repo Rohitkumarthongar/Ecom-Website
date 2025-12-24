@@ -39,9 +39,9 @@ class UserBase(BaseModel):
     email: Optional[str] = None
     gst_number: Optional[str] = None
     is_gst_verified: bool = False
-    is_wholesale: bool = False
     address: Optional[Dict[str, str]] = None
-    role: str = "customer"  # customer, admin
+    addresses: Optional[List[Dict[str, str]]] = []
+    role: str = "customer"  # customer, seller, admin
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class UserCreate(BaseModel):
@@ -51,6 +51,12 @@ class UserCreate(BaseModel):
     gst_number: Optional[str] = None
     password: str
     request_seller: bool = False  # User requesting seller upgrade
+
+class AdminCreate(BaseModel):
+    phone: str
+    name: str
+    email: Optional[str] = None
+    password: str
 
 class UserAddressUpdate(BaseModel):
     addresses: List[Dict[str, str]]
