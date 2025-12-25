@@ -11,21 +11,48 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from '../components/ui/sheet';
 import { Badge } from '../components/ui/badge';
-import { 
-  Search, ShoppingCart, User, Menu, Heart, Package, 
-  LogOut, Sun, Moon, ChevronRight, Minus, Plus, Trash2 
+import {
+  Search, ShoppingCart, User, Menu, Heart, Package,
+  LogOut, Sun, Moon, ChevronRight, Minus, Plus, Trash2
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import api from '../lib/api';
+import { getImageUrl } from '../lib/utils';
 
 export const StoreHeader = () => {
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout, isAdmin, isWholesale } = useAuth();
   const { items, getItemCount, getSubtotal, updateQuantity, removeItem } = useCart();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [cartOpen, setCartOpen] = useState(false);
+  const [settings, setSettings] = useState(null);
+
+  useEffect(() => {
+    fetchSettings();
+  }, []);
+
+  const fetchSettings = async () => {
+    try {
+      const response = await api.get('/settings/public');
+      setSettings(response.data);
+      // Update page title and favicon
+      if (response.data.business_name) {
+        document.title = response.data.business_name;
+      }
+      if (response.data.favicon_url) {
+        const link = document.querySelector("link[rel~='icon']") || document.createElement('link');
+        link.rel = 'icon';
+        link.href = response.data.favicon_url;
+        document.head.appendChild(link);
+      }
+    } catch (error) {
+      console.error('Failed to fetch settings:', error);
+    }
+  };
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -36,20 +63,26 @@ export const StoreHeader = () => {
 
   return (
     <header className="sticky top-0 z-50 glass border-b" data-testid="store-header">
-      {/* Top Bar */}
-      <div className="bg-gradient-to-r from-[#f43397] to-[#5b21b6] text-white py-1.5 px-4 text-center text-sm font-medium">
-        Free Shipping on orders above ₹499 | Use code FIRST10 for 10% off
-      </div>
+      {/* Top Bar - Only visible for normal customers (not wholesale) */}
+      {!isWholesale && (
+        <div className="bg-gradient-to-r from-[#f43397] to-[#5b21b6] text-white py-1.5 px-4 text-center text-sm font-medium">
+          Free Shipping on orders above ₹1599
+        </div>
+      )}
 
       {/* Main Header */}
       <div className="max-w-7xl mx-auto px-4 py-3">
         <div className="flex items-center justify-between gap-4">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2" data-testid="logo-link">
-            <div className="w-10 h-10 rounded-xl gradient-hero flex items-center justify-center">
-              <span className="text-white font-extrabold text-xl">B</span>
-            </div>
-            <span className="text-xl font-extrabold text-foreground hidden sm:block">BharatBazaar</span>
+            {settings?.logo_url ? (
+              <img src={getImageUrl(settings.logo_url)} alt="Logo" className="h-10 w-auto object-contain rounded-lg" />
+            ) : (
+              <div className="h-10 w-10 rounded-xl gradient-hero flex items-center justify-center flex-shrink-0">
+                <span className="text-white font-extrabold text-xl">{settings?.business_name?.[0] || 'B'}</span>
+              </div>
+            )}
+            <span className="text-xl font-extrabold text-foreground hidden sm:block">{settings?.business_name || 'Amorlias'}</span>
           </Link>
 
           {/* Search Bar - Desktop */}
@@ -121,8 +154,8 @@ export const StoreHeader = () => {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <Button 
-                onClick={() => navigate('/login')} 
+              <Button
+                onClick={() => navigate('/login')}
                 className="btn-primary text-sm py-2 px-4"
                 data-testid="login-btn"
               >
@@ -131,7 +164,8 @@ export const StoreHeader = () => {
             )}
 
             {/* Cart */}
-            <Sheet>
+
+            <Sheet open={cartOpen} onOpenChange={setCartOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" className="relative" data-testid="cart-trigger">
                   <ShoppingCart className="w-5 h-5" />
@@ -148,13 +182,19 @@ export const StoreHeader = () => {
                     <ShoppingCart className="w-5 h-5" />
                     Your Cart ({getItemCount()} items)
                   </SheetTitle>
+                  <SheetDescription>
+                    Review your items and proceed to checkout
+                  </SheetDescription>
                 </SheetHeader>
-                <div className="mt-6 flex-1 overflow-auto">
+                <div className="mt-6 flex-1 overflow-auto scrollbar-invisible">
                   {items.length === 0 ? (
                     <div className="text-center py-12">
                       <ShoppingCart className="w-16 h-16 mx-auto text-muted-foreground/50" />
                       <p className="mt-4 text-muted-foreground">Your cart is empty</p>
-                      <Button onClick={() => navigate('/products')} className="mt-4 btn-primary">
+                      <Button onClick={() => {
+                        setCartOpen(false);
+                        navigate('/products');
+                      }} className="mt-4 btn-primary">
                         Start Shopping
                       </Button>
                     </div>
@@ -163,7 +203,7 @@ export const StoreHeader = () => {
                       {items.map((item) => (
                         <div key={item.product.id} className="flex gap-3 p-3 bg-muted/50 rounded-xl">
                           <img
-                            src={item.product.images?.[0] || 'https://via.placeholder.com/80'}
+                            src={getImageUrl(item.product.images?.[0]) || 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=80&h=80&fit=crop&crop=center'}
                             alt={item.product.name}
                             className="w-20 h-20 object-cover rounded-lg"
                           />
@@ -211,8 +251,15 @@ export const StoreHeader = () => {
                       <span>Subtotal</span>
                       <span className="price-tag">₹{getSubtotal().toLocaleString()}</span>
                     </div>
-                    <Button 
-                      onClick={() => navigate('/checkout')} 
+                    <Button
+                      onClick={() => {
+                        setCartOpen(false);
+                        if (user) {
+                          navigate('/checkout');
+                        } else {
+                          navigate('/login?redirect=/checkout');
+                        }
+                      }}
                       className="w-full btn-primary"
                       data-testid="checkout-btn"
                     >
@@ -267,16 +314,35 @@ export const StoreHeader = () => {
 };
 
 export const StoreFooter = () => {
+  const [settings, setSettings] = useState(null);
+
+  useEffect(() => {
+    fetchSettings();
+  }, []);
+
+  const fetchSettings = async () => {
+    try {
+      const response = await api.get('/settings/public');
+      setSettings(response.data);
+    } catch (error) {
+      console.error('Failed to fetch settings:', error);
+    }
+  };
+
   return (
     <footer className="bg-slate-900 text-white mt-auto" data-testid="store-footer">
       <div className="max-w-7xl mx-auto px-4 py-12">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-10 h-10 rounded-xl gradient-hero flex items-center justify-center">
-                <span className="text-white font-extrabold text-xl">B</span>
-              </div>
-              <span className="text-xl font-extrabold">BharatBazaar</span>
+              {settings?.logo_url ? (
+                <img src={getImageUrl(settings.logo_url)} alt="Logo" className="w-10 h-10 rounded-xl object-cover" />
+              ) : (
+                <div className="w-10 h-10 rounded-xl gradient-hero flex items-center justify-center">
+                  <span className="text-white font-extrabold text-xl">{settings?.business_name?.[0] || 'B'}</span>
+                </div>
+              )}
+              <span className="text-xl font-extrabold">{settings?.business_name || 'Amorlias'}</span>
             </div>
             <p className="text-slate-400 text-sm">
               India's favorite online marketplace for fashion, electronics, and more.
@@ -311,7 +377,7 @@ export const StoreFooter = () => {
         </div>
 
         <div className="border-t border-slate-800 mt-8 pt-8 text-center text-sm text-slate-400">
-          <p>© 2024 BharatBazaar. All rights reserved.</p>
+          <p>© 2024 {settings?.business_name || 'Amorlias'}. All rights reserved.</p>
         </div>
       </div>
     </footer>

@@ -1,101 +1,64 @@
-import { Link, useNavigate, Navigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Checkbox } from '../components/ui/checkbox';
-import { InputOTP, InputOTPGroup, InputOTPSlot } from '../components/ui/input-otp';
+import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useNavigate, Navigate, useSearchParams } from 'react-router-dom';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+import { Label } from '../components/ui/label';
+import { Input } from '../components/ui/input';
+import { Button } from '../components/ui/button';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '../components/ui/input-otp';
 import { toast } from 'sonner';
-import { Eye, EyeOff, Phone, Lock, User, Building2, ChevronRight } from 'lucide-react';
+import { Eye, EyeOff, ChevronRight, Mail, Phone, User } from 'lucide-react';
+import api from '../lib/api';
 
 export default function LoginPage() {
-  const navigate = useNavigate();
-  const { user, sendOTP, verifyOTP, register, login } = useAuth();
-  
-  // Redirect if already logged in
-  if (user) {
-    return <Navigate to="/" replace />;
-  }
-  
   const [activeTab, setActiveTab] = useState('login');
-  const [step, setStep] = useState('phone'); // phone, otp, details
-  const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  
-  // Form data
-  const [phone, setPhone] = useState('');
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const redirectTo = searchParams.get('redirect') || '/';
+  const { user, login } = useAuth();
+
+  // Login State
+  const [identifier, setIdentifier] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+
+  // Register State
+  const [step, setStep] = useState('details');
+  const [regName, setRegName] = useState('');
+  const [regPhone, setRegPhone] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [requestSupplier, setRequestSupplier] = useState(false);
+  const [regGst, setRegGst] = useState('');
   const [otp, setOtp] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [gstNumber, setGstNumber] = useState('');
-  const [hasGst, setHasGst] = useState(false);
+  const [regPassword, setRegPassword] = useState('');
 
-  const handleSendOTP = async (e) => {
+  // Forgot Password State
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+
+  if (user) {
+    return <Navigate to={redirectTo} replace />;
+  }
+
+  const handleForgotPassword = async (e) => {
     e.preventDefault();
-    if (!phone || phone.length < 10) {
-      toast.error('Please enter a valid phone number');
+    if (!forgotEmail) {
+      toast.error("Please enter your email");
       return;
     }
-
     setLoading(true);
     try {
-      const result = await sendOTP(`+91${phone}`);
-      toast.success('OTP sent successfully!');
-      // For testing, show OTP
-      if (result.otp_for_testing) {
-        toast.info(`Test OTP: ${result.otp_for_testing}`);
-      }
-      setStep('otp');
+      const response = await api.post('/auth/forgot-password', { email: forgotEmail });
+      toast.success(response.data.message || "Password sent to your email!");
+      setShowForgot(false);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to send OTP');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyOTP = async (e) => {
-    e.preventDefault();
-    if (otp.length !== 6) {
-      toast.error('Please enter valid 6-digit OTP');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      await verifyOTP(`+91${phone}`, otp);
-      toast.success('OTP verified!');
-      setStep('details');
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Invalid OTP');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRegister = async (e) => {
-    e.preventDefault();
-    if (!name || !password) {
-      toast.error('Please fill all required fields');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      await register({
-        phone: `+91${phone}`,
-        name,
-        email,
-        password,
-        gst_number: hasGst ? gstNumber : null,
-      });
-      toast.success('Registration successful!');
-      navigate('/');
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Registration failed');
+      const errorMsg = error.response?.data?.detail ||
+        (error.response?.data?.message) ||
+        (Array.isArray(error.response?.data) ? error.response.data[0]?.msg : null) ||
+        "Failed to reset password";
+      toast.error(typeof errorMsg === 'string' ? errorMsg : "Failed to reset password");
     } finally {
       setLoading(false);
     }
@@ -103,74 +66,303 @@ export default function LoginPage() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    if (!phone || !password) {
-      toast.error('Please enter phone and password');
+    if (!identifier || !loginPassword) {
+      toast.error("Please fill in all fields");
       return;
     }
-
     setLoading(true);
     try {
-      await login(`+91${phone}`, password);
-      toast.success('Login successful!');
-      navigate('/');
+      await login({ identifier, password: loginPassword });
+      toast.success("Welcome back!");
+      navigate(redirectTo);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Invalid credentials');
+      console.error(error);
+      const errorMsg = error.response?.data?.detail ||
+        (Array.isArray(error.response?.data) ? error.response.data[0]?.msg : null) ||
+        "Login failed";
+      toast.error(typeof errorMsg === 'string' ? errorMsg : "Login failed");
     } finally {
       setLoading(false);
     }
   };
 
+  const handleSendOTP = async (e) => {
+    e.preventDefault();
+    if (!regName || !regPhone || !regEmail) {
+      toast.error("Please fill in Name, Phone and Email");
+      return;
+    }
+    setLoading(true);
+    try {
+      await api.post('/auth/send-otp', { phone: regPhone, email: regEmail });
+      toast.success(`OTP sent to ${regEmail}`);
+      setStep('otp');
+    } catch (error) {
+      const errorMsg = error.response?.data?.detail ||
+        (Array.isArray(error.response?.data) ? error.response.data[0]?.msg : null) ||
+        "Failed to send OTP";
+      toast.error(typeof errorMsg === 'string' ? errorMsg : "Failed to send OTP");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOTP = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await api.post('/auth/verify-otp', { phone: regPhone, otp });
+      if (res.data.verified) {
+        toast.success("OTP Verified!");
+        setStep('password');
+      }
+    } catch (error) {
+      toast.error("Invalid OTP");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    if (!regPassword) {
+      toast.error("Please set a password");
+      return;
+    }
+    setLoading(true);
+    try {
+      const response = await api.post("/auth/register", {
+        name: regName,
+        phone: regPhone,
+        email: regEmail,
+        password: regPassword,
+        gst_number: requestSupplier ? regGst : null
+      });
+      if (response.data.supplier_pending) {
+        toast.info(response.data.message);
+      }
+      // Auto login after register
+      await login({ identifier: regPhone, password: regPassword });
+      toast.success("Account created successfully!");
+      navigate(redirectTo);
+    } catch (error) {
+      const errorMsg = error.response?.data?.detail ||
+        (Array.isArray(error.response?.data) ? error.response.data[0]?.msg : null) ||
+        "Registration failed";
+      toast.error(typeof errorMsg === 'string' ? errorMsg : "Registration failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (showForgot) {
+    return (
+      <div className="min-h-screen pt-20 pb-12 flex items-center justify-center px-4 bg-muted/30">
+        <Card className="w-full max-w-md border-0 shadow-lg">
+          <CardHeader>
+            <CardTitle>Forgot Password</CardTitle>
+            <CardDescription>Enter your email to receive a new password</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="forgot-email">Email Address</Label>
+                <Input
+                  id="forgot-email"
+                  type="email"
+                  placeholder="you@amorlias.com"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                />
+              </div>
+              <Button type="submit" className="w-full btn-primary" disabled={loading}>
+                {loading ? 'Sending...' : 'Send Password'}
+              </Button>
+              <Button type="button" variant="ghost" className="w-full" onClick={() => setShowForgot(false)}>
+                Back to Login
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-[calc(100vh-200px)] flex items-center justify-center px-4 py-12" data-testid="login-page">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 rounded-2xl gradient-hero flex items-center justify-center mx-auto mb-4">
-            <span className="text-white font-extrabold text-3xl">B</span>
-          </div>
-          <h1 className="text-2xl font-bold">Welcome to BharatBazaar</h1>
-          <p className="text-muted-foreground mt-1">Login or create an account to continue</p>
-        </div>
+    <div className="min-h-screen pt-20 pb-12 flex items-center justify-center px-4 bg-muted/30">
+      <Card className="w-full max-w-md border-0 shadow-lg">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="login">Login</TabsTrigger>
+            <TabsTrigger value="register">Register</TabsTrigger>
+          </TabsList>
 
-        <Card>
-          <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setStep('phone'); }}>
-            <TabsList className="w-full">
-              <TabsTrigger value="login" className="flex-1" data-testid="login-tab">Login</TabsTrigger>
-              <TabsTrigger value="register" className="flex-1" data-testid="register-tab">Register</TabsTrigger>
-            </TabsList>
+          {/* LOGIN CONTENT */}
+          <TabsContent value="login">
+            <CardHeader>
+              <CardTitle>Welcome Back</CardTitle>
+              <CardDescription>Login with your Phone or Email</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="identifier">Phone or Email</Label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      id="identifier"
+                      placeholder="9876543210 or user@example.com"
+                      value={identifier}
+                      onChange={(e) => setIdentifier(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Enter password"
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <button type="button" onClick={() => setShowForgot(true)} className="text-sm text-primary hover:underline">Forgot password?</button>
+                </div>
+                <Button type="submit" className="w-full btn-primary" disabled={loading}>
+                  {loading ? 'Logging in...' : 'Login'}
+                  <ChevronRight className="w-4 h-4 ml-2" />
+                </Button>
+              </form>
+            </CardContent>
+          </TabsContent>
 
-            {/* Login Tab */}
-            <TabsContent value="login">
-              <CardHeader>
-                <CardTitle>Login to your account</CardTitle>
-                <CardDescription>Enter your phone number and password</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleLogin} className="space-y-4">
+          {/* REGISTER CONTENT */}
+          <TabsContent value="register">
+            <CardHeader>
+              <CardTitle>Create Account</CardTitle>
+              <CardDescription>
+                {step === 'details' && 'Enter your details'}
+                {step === 'otp' && 'Verify OTP sent to your email'}
+                {step === 'password' && 'Set a password'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {/* Step 1: Details */}
+              {step === 'details' && (
+                <form onSubmit={handleSendOTP} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="login-phone">Phone Number</Label>
+                    <Label htmlFor="reg-name">Full Name</Label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">+91</span>
-                      <Input
-                        id="login-phone"
-                        type="tel"
-                        placeholder="9876543210"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                        className="pl-12"
-                        data-testid="login-phone-input"
-                      />
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input id="reg-name" placeholder="John Doe" value={regName} onChange={(e) => setRegName(e.target.value)} className="pl-10" />
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="login-password">Password</Label>
+                    <Label htmlFor="reg-phone">Phone Number</Label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input id="reg-phone" type="tel" placeholder="9876543210" value={regPhone} onChange={(e) => setRegPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} className="pl-10" />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="reg-email">Email Address</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input id="reg-email" type="email" placeholder="you@amorlias.com" value={regEmail} onChange={(e) => setRegEmail(e.target.value)} className="pl-10" />
+                    </div>
+                  </div>
+
+                  {/* Supplier Registration */}
+                  <div className="space-y-3 p-4 bg-purple-50 dark:bg-purple-950/20 rounded-lg border border-purple-200 dark:border-purple-800 mt-4">
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        id="request-supplier"
+                        checked={requestSupplier}
+                        onChange={(e) => setRequestSupplier(e.target.checked)}
+                        className="mt-1"
+                      />
+                      <label htmlFor="request-supplier" className="text-sm cursor-pointer">
+                        <strong className="text-purple-700 dark:text-purple-300">Register as Supplier</strong> to get wholesale prices
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Get access to bulk pricing and special supplier benefits
+                        </p>
+                      </label>
+                    </div>
+                    
+                    {requestSupplier && (
+                      <div className="space-y-2 pl-7">
+                        <Label htmlFor="reg-gst">GST Number (Required for Suppliers)</Label>
+                        <Input
+                          id="reg-gst"
+                          placeholder="22AAAAA0000A1Z5"
+                          value={regGst}
+                          onChange={(e) => setRegGst(e.target.value.toUpperCase())}
+                          className="font-mono"
+                          required={requestSupplier}
+                        />
+                        <p className="text-xs text-amber-600 dark:text-amber-400">
+                          ⚠️ Admin approval required. You'll be notified via email once approved.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  <Button type="submit" className="w-full btn-primary" disabled={loading}>
+                    {loading ? 'Sending OTP...' : 'Continue'}
+                    <ChevronRight className="w-4 h-4 ml-2" />
+                  </Button>
+                </form>
+              )}
+
+              {/* Step 2: OTP */}
+              {step === 'otp' && (
+                <form onSubmit={handleVerifyOTP} className="space-y-4">
+                  <div className="text-center mb-4">
+                    <p className="text-sm text-muted-foreground">OTP sent to {regEmail}</p>
+                  </div>
+                  <div className="flex justify-center">
+                    <InputOTP maxLength={6} value={otp} onChange={setOtp}>
+                      <InputOTPGroup>
+                        <InputOTPSlot index={0} />
+                        <InputOTPSlot index={1} />
+                        <InputOTPSlot index={2} />
+                        <InputOTPSlot index={3} />
+                        <InputOTPSlot index={4} />
+                        <InputOTPSlot index={5} />
+                      </InputOTPGroup>
+                    </InputOTP>
+                  </div>
+                  <Button type="submit" className="w-full btn-primary" disabled={loading}>
+                    {loading ? 'Verifying...' : 'Verify OTP'}
+                  </Button>
+                  <Button type="button" variant="ghost" className="w-full" onClick={() => setStep('details')}>Back</Button>
+                </form>
+              )}
+
+              {/* Step 3: Password */}
+              {step === 'password' && (
+                <form onSubmit={handleRegister} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="reg-pass">Create Password</Label>
                     <div className="relative">
                       <Input
-                        id="login-password"
+                        id="reg-pass"
                         type={showPassword ? 'text' : 'password'}
-                        placeholder="Enter password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        data-testid="login-password-input"
+                        placeholder="******"
+                        value={regPassword}
+                        onChange={(e) => setRegPassword(e.target.value)}
                       />
                       <button
                         type="button"
@@ -181,168 +373,15 @@ export default function LoginPage() {
                       </button>
                     </div>
                   </div>
-                  <Button type="submit" className="w-full btn-primary" disabled={loading} data-testid="login-submit-btn">
-                    {loading ? 'Logging in...' : 'Login'}
-                    <ChevronRight className="w-4 h-4 ml-2" />
+                  <Button type="submit" className="w-full btn-primary" disabled={loading}>
+                    {loading ? 'Creating Account...' : 'Finish Registration'}
                   </Button>
                 </form>
-              </CardContent>
-            </TabsContent>
-
-            {/* Register Tab */}
-            <TabsContent value="register">
-              <CardHeader>
-                <CardTitle>
-                  {step === 'phone' && 'Create Account'}
-                  {step === 'otp' && 'Verify OTP'}
-                  {step === 'details' && 'Complete Profile'}
-                </CardTitle>
-                <CardDescription>
-                  {step === 'phone' && 'Enter your phone number to get started'}
-                  {step === 'otp' && 'Enter the 6-digit code sent to your phone'}
-                  {step === 'details' && 'Fill in your details to complete registration'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {/* Step 1: Phone */}
-                {step === 'phone' && (
-                  <form onSubmit={handleSendOTP} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="reg-phone">Phone Number</Label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">+91</span>
-                        <Input
-                          id="reg-phone"
-                          type="tel"
-                          placeholder="9876543210"
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                          className="pl-12"
-                          data-testid="register-phone-input"
-                        />
-                      </div>
-                    </div>
-                    <Button type="submit" className="w-full btn-primary" disabled={loading} data-testid="send-otp-btn">
-                      {loading ? 'Sending...' : 'Send OTP'}
-                      <ChevronRight className="w-4 h-4 ml-2" />
-                    </Button>
-                  </form>
-                )}
-
-                {/* Step 2: OTP */}
-                {step === 'otp' && (
-                  <form onSubmit={handleVerifyOTP} className="space-y-4">
-                    <div className="flex justify-center">
-                      <InputOTP maxLength={6} value={otp} onChange={setOtp} data-testid="otp-input">
-                        <InputOTPGroup>
-                          <InputOTPSlot index={0} />
-                          <InputOTPSlot index={1} />
-                          <InputOTPSlot index={2} />
-                          <InputOTPSlot index={3} />
-                          <InputOTPSlot index={4} />
-                          <InputOTPSlot index={5} />
-                        </InputOTPGroup>
-                      </InputOTP>
-                    </div>
-                    <p className="text-center text-sm text-muted-foreground">
-                      Didn't receive? <button type="button" onClick={handleSendOTP} className="text-primary font-medium">Resend OTP</button>
-                    </p>
-                    <Button type="submit" className="w-full btn-primary" disabled={loading} data-testid="verify-otp-btn">
-                      {loading ? 'Verifying...' : 'Verify OTP'}
-                    </Button>
-                    <Button type="button" variant="ghost" className="w-full" onClick={() => setStep('phone')}>
-                      Change Phone Number
-                    </Button>
-                  </form>
-                )}
-
-                {/* Step 3: Details */}
-                {step === 'details' && (
-                  <form onSubmit={handleRegister} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name">Full Name *</Label>
-                      <Input
-                        id="name"
-                        placeholder="Enter your name"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        data-testid="register-name-input"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email (Optional)</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder="your@email.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="reg-password">Password *</Label>
-                      <div className="relative">
-                        <Input
-                          id="reg-password"
-                          type={showPassword ? 'text' : 'password'}
-                          placeholder="Create password"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          data-testid="register-password-input"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                        >
-                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* GST Section */}
-                    <div className="p-4 bg-[#5b21b6]/5 rounded-xl border border-[#5b21b6]/20">
-                      <div className="flex items-center gap-3">
-                        <Checkbox
-                          id="hasGst"
-                          checked={hasGst}
-                          onCheckedChange={setHasGst}
-                        />
-                        <div>
-                          <Label htmlFor="hasGst" className="font-medium cursor-pointer">
-                            I have a GST Number
-                          </Label>
-                          <p className="text-xs text-muted-foreground">Get wholesale prices on bulk orders</p>
-                        </div>
-                      </div>
-                      {hasGst && (
-                        <div className="mt-3">
-                          <Input
-                            placeholder="Enter GST Number (e.g., 29ABCDE1234F1Z5)"
-                            value={gstNumber}
-                            onChange={(e) => setGstNumber(e.target.value.toUpperCase())}
-                            data-testid="gst-input"
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    <Button type="submit" className="w-full btn-primary" disabled={loading} data-testid="register-submit-btn">
-                      {loading ? 'Creating Account...' : 'Create Account'}
-                      <ChevronRight className="w-4 h-4 ml-2" />
-                    </Button>
-                  </form>
-                )}
-              </CardContent>
-            </TabsContent>
-          </Tabs>
-        </Card>
-
-        {/* Admin Login Link */}
-        <p className="text-center text-sm text-muted-foreground mt-6">
-          Are you a seller? <button onClick={() => navigate('/admin')} className="text-primary font-medium">Access Admin Panel</button>
-        </p>
-      </div>
+              )}
+            </CardContent>
+          </TabsContent>
+        </Tabs>
+      </Card>
     </div>
   );
 }

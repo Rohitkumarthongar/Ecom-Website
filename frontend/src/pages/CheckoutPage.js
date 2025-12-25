@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -15,7 +15,7 @@ import { CreditCard, Truck, Shield, ChevronLeft, Smartphone, Banknote, Building 
 export default function CheckoutPage() {
   const navigate = useNavigate();
   const { items, getSubtotal, clearCart } = useCart();
-  const { user, isWholesale } = useAuth();
+  const { user, isWholesale, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('cod');
 
@@ -29,6 +29,54 @@ export default function CheckoutPage() {
     pincode: '',
   });
 
+  // Update address when user data loads
+  useEffect(() => {
+    if (user) {
+      setAddress(prev => {
+        const newAddress = {
+          ...prev,
+          name: user.name || prev.name,
+          phone: user.phone || prev.phone,
+        };
+
+        // Try to get address from profile (either single address or first of addresses list)
+        const savedAddress = user.address || (user.addresses && user.addresses.length > 0 ? user.addresses[0] : null);
+
+        if (savedAddress) {
+          newAddress.line1 = savedAddress.line1 || prev.line1;
+          newAddress.line2 = savedAddress.line2 || prev.line2;
+          newAddress.city = savedAddress.city || prev.city;
+          newAddress.state = savedAddress.state || prev.state;
+          newAddress.pincode = savedAddress.pincode || prev.pincode;
+        }
+
+        return newAddress;
+      });
+    }
+  }, [user]);
+
+  // Redirect to login if not authenticated
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate('/login?redirect=/checkout');
+    }
+  }, [authLoading, user, navigate]);
+
+  if (!authLoading && !user) {
+    return null;
+  }
+
+  // Show loading while checking authentication
+  if (authLoading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-12 text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+        <p className="mt-4 text-muted-foreground">Loading...</p>
+      </div>
+    );
+  }
+
   const subtotal = getSubtotal();
   const gstAmount = subtotal * 0.18; // Simplified GST calculation
   const deliveryFee = subtotal >= 499 ? 0 : 40;
@@ -40,7 +88,7 @@ export default function CheckoutPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!address.name || !address.phone || !address.line1 || !address.city || !address.pincode) {
       toast.error('Please fill all required address fields');
       return;
@@ -62,7 +110,12 @@ export default function CheckoutPage() {
       toast.success('Order placed successfully!');
       navigate(`/orders/${response.data.id}`);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to place order');
+      console.error('Order creation error:', error);
+      const errorMessage = error.response?.data?.detail ||
+        error.response?.data?.message ||
+        error.message ||
+        'Failed to place order';
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -207,9 +260,8 @@ export default function CheckoutPage() {
                   {paymentOptions.map((option) => (
                     <label
                       key={option.id}
-                      className={`flex items-center gap-3 p-4 border rounded-xl cursor-pointer transition-all ${
-                        paymentMethod === option.id ? 'border-primary bg-primary/5' : 'hover:border-muted-foreground/50'
-                      }`}
+                      className={`flex items-center gap-3 p-4 border rounded-xl cursor-pointer transition-all ${paymentMethod === option.id ? 'border-primary bg-primary/5' : 'hover:border-muted-foreground/50'
+                        }`}
                     >
                       <RadioGroupItem value={option.id} id={option.id} />
                       <option.icon className="w-5 h-5 text-muted-foreground" />
@@ -237,18 +289,20 @@ export default function CheckoutPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Items */}
-                <div className="space-y-3 max-h-60 overflow-auto">
+                <div className="space-y-3 max-h-60 overflow-y-auto scrollbar-invisible">
                   {items.map((item) => (
-                    <div key={item.product.id} className="flex gap-3">
+                    <div key={item.product.id} className="flex gap-3 items-start">
                       <img
-                        src={item.product.images?.[0] || 'https://via.placeholder.com/60'}
+                        src={item.product.images?.[0] || 'https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=60&h=60&fit=crop&crop=center'}
                         alt={item.product.name}
-                        className="w-15 h-15 object-cover rounded-lg"
+                        className="w-12 h-12 object-cover rounded-lg flex-shrink-0"
                       />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{item.product.name}</p>
-                        <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
-                        <p className="text-sm font-semibold">₹{(item.product.selling_price * item.quantity).toLocaleString()}</p>
+                        <div className="flex justify-between items-center mt-1">
+                          <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
+                          <p className="text-sm font-semibold">₹{(item.product.selling_price * item.quantity).toLocaleString()}</p>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -287,9 +341,9 @@ export default function CheckoutPage() {
                   </p>
                 )}
 
-                <Button 
-                  type="submit" 
-                  className="w-full btn-primary" 
+                <Button
+                  type="submit"
+                  className="w-full btn-primary"
                   disabled={loading}
                   data-testid="place-order-btn"
                 >

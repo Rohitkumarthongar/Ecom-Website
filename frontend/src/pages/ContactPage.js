@@ -4,7 +4,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { pagesAPI, settingsAPI } from '../lib/api';
+import api from '../lib/api';
 import { toast } from 'sonner';
 import { MapPin, Phone, Mail, Send, Clock } from 'lucide-react';
 
@@ -25,10 +25,10 @@ export default function ContactPage() {
 
   const fetchContact = async () => {
     try {
-      const response = await pagesAPI.getContact();
-      setSettings(response.data?.business);
+      const response = await api.get('/settings/public');
+      setSettings(response.data);
     } catch (error) {
-      console.log('Using default contact');
+      console.log('Failed to fetch settings:', error);
     }
   };
 
@@ -175,7 +175,7 @@ export default function ContactPage() {
                 <div>
                   <h3 className="font-semibold">Email</h3>
                   <p className="text-muted-foreground mt-1">
-                    {settings?.email || 'support@bharatbazaar.com'}
+                    {settings?.email || 'support@amorlias.com'}
                   </p>
                   <p className="text-sm text-muted-foreground">We reply within 24 hours</p>
                 </div>

@@ -227,7 +227,7 @@ export default function AdminPOS() {
       </head>
       <body>
         <div class="header">
-          <h1>BharatBazaar</h1>
+          <h1>Amorlias Mart</h1>
           <p>Invoice #${lastOrder.order_number}</p>
           <p>${new Date(lastOrder.created_at).toLocaleString('en-IN')}</p>
         </div>
@@ -309,7 +309,7 @@ export default function AdminPOS() {
           />
         </div>
 
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto scrollbar-invisible">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {filteredProducts.map((product) => (
               <Card
@@ -389,7 +389,7 @@ export default function AdminPOS() {
           </div>
 
           {/* Cart Items */}
-          <div className="flex-1 overflow-auto space-y-2">
+          <div className="flex-1 overflow-auto scrollbar-invisible space-y-2">
             {cart.length === 0 ? (
               <div className="text-center py-8 text-slate-400">
                 <ShoppingCart className="w-12 h-12 mx-auto mb-2 opacity-50" />

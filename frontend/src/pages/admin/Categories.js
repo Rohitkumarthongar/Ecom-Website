@@ -8,7 +8,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
 import { Textarea } from '../../components/ui/textarea';
 import { Switch } from '../../components/ui/switch';
+import { SingleImageUpload } from '../../components/ui/image-upload';
 import { categoriesAPI } from '../../lib/api';
+import { getImageUrl } from '../../lib/utils';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, FolderTree } from 'lucide-react';
 
@@ -134,12 +136,13 @@ export default function AdminCategories() {
               </div>
 
               <div className="space-y-2">
-                <Label>Image URL</Label>
-                <Input
+                <Label>Category Image</Label>
+                <SingleImageUpload
                   value={formData.image_url}
-                  onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                  placeholder="https://..."
-                  className="input-admin"
+                  onChange={(imageUrl) => setFormData({ ...formData, image_url: imageUrl })}
+                  folder="categories"
+                  label=""
+                  description="Upload category image (max 5MB)"
                 />
               </div>
 
@@ -195,7 +198,7 @@ export default function AdminCategories() {
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-slate-700 rounded-lg overflow-hidden">
                           {category.image_url && (
-                            <img src={category.image_url} alt="" className="w-full h-full object-cover" />
+                            <img src={getImageUrl(category.image_url)} alt="" className="w-full h-full object-cover" />
                           )}
                         </div>
                         <span className="font-medium">{category.name}</span>

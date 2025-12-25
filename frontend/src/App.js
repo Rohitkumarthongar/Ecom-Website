@@ -33,10 +33,12 @@ import AdminReturns from './pages/admin/Returns';
 import AdminBanners from './pages/admin/Banners';
 import AdminOffers from './pages/admin/Offers';
 import AdminCouriers from './pages/admin/Couriers';
+import AdminShipping from './pages/admin/ShippingManagement';
 import AdminPayments from './pages/admin/Payments';
 import AdminReports from './pages/admin/Reports';
 import AdminSettings from './pages/admin/Settings';
 import AdminPages from './pages/admin/Pages';
+import AdminTeam from './pages/admin/Team';
 
 // Protected Route Component
 const ProtectedRoute = ({ children, adminOnly = false }) => {
@@ -108,6 +110,7 @@ function AppContent() {
         <Route path="/admin/categories" element={<AdminRoutes><AdminCategories /></AdminRoutes>} />
         <Route path="/admin/inventory" element={<AdminRoutes><AdminInventory /></AdminRoutes>} />
         <Route path="/admin/orders" element={<AdminRoutes><AdminOrders /></AdminRoutes>} />
+        <Route path="/admin/shipping" element={<AdminRoutes><AdminShipping /></AdminRoutes>} />
         <Route path="/admin/pos" element={<AdminRoutes><AdminPOS /></AdminRoutes>} />
         <Route path="/admin/returns" element={<AdminRoutes><AdminReturns /></AdminRoutes>} />
         <Route path="/admin/banners" element={<AdminRoutes><AdminBanners /></AdminRoutes>} />
@@ -117,6 +120,7 @@ function AppContent() {
         <Route path="/admin/reports" element={<AdminRoutes><AdminReports /></AdminRoutes>} />
         <Route path="/admin/settings" element={<AdminRoutes><AdminSettings /></AdminRoutes>} />
         <Route path="/admin/pages" element={<AdminRoutes><AdminPages /></AdminRoutes>} />
+        <Route path="/admin/team" element={<AdminRoutes><AdminTeam /></AdminRoutes>} />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
@@ -131,9 +135,9 @@ function App() {
       <AuthProvider>
         <CartProvider>
           <AppContent />
-          <Toaster 
-            position="top-right" 
-            richColors 
+          <Toaster
+            position="top-right"
+            richColors
             closeButton
             toastOptions={{
               style: {

@@ -40,6 +40,22 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleClearData = async () => {
+    if (!window.confirm("Are you sure you want to clear ALL data? This will delete orders, products, customers, and more. This action cannot be undone.")) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await dashboardAPI.clearData();
+      toast.success('All data cleared successfully');
+      fetchDashboard();
+    } catch (error) {
+      toast.error('Failed to clear data');
+      setLoading(false);
+    }
+  };
+
   const statCards = [
     {
       title: "Today's Revenue",
@@ -117,13 +133,20 @@ export default function AdminDashboard() {
           <p className="text-slate-400">Welcome back! Here's your store overview.</p>
         </div>
         <div className="flex gap-2">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={handleSeedData}
             className="border-slate-600 hover:bg-slate-700"
             data-testid="seed-data-btn"
           >
             Add Sample Data
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleClearData}
+            className="border-red-600 text-red-400 hover:bg-red-500/10"
+          >
+            Clear Data
           </Button>
           <Button onClick={fetchDashboard} variant="outline" className="border-slate-600 hover:bg-slate-700">
             <RefreshCcw className="w-4 h-4 mr-2" />

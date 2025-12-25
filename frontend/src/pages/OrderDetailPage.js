@@ -37,6 +37,23 @@ export default function OrderDetailPage() {
     }
   };
 
+  const handleDownloadInvoice = async () => {
+    try {
+      const response = await ordersAPI.getInvoice(id);
+
+      // Create blob link to download
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Invoice_${order.order_number}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      toast.error('Failed to download invoice');
+    }
+  };
+
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
@@ -101,22 +118,21 @@ export default function OrderDetailPage() {
             <div className="flex items-center justify-between relative">
               {/* Progress Line */}
               <div className="absolute top-5 left-0 right-0 h-1 bg-muted">
-                <div 
+                <div
                   className="h-full bg-primary transition-all"
                   style={{ width: `${(currentStepIndex / (statusSteps.length - 1)) * 100}%` }}
                 />
               </div>
-              
+
               {statusSteps.map((step, index) => {
                 const isCompleted = index <= currentStepIndex;
                 const isCurrent = index === currentStepIndex;
                 const StepIcon = step.icon;
-                
+
                 return (
                   <div key={step.key} className="relative flex flex-col items-center z-10">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
-                      isCompleted ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
-                    } ${isCurrent ? 'ring-4 ring-primary/20' : ''}`}>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${isCompleted ? 'bg-primary text-white' : 'bg-muted text-muted-foreground'
+                      } ${isCurrent ? 'ring-4 ring-primary/20' : ''}`}>
                       <StepIcon className="w-5 h-5" />
                     </div>
                     <span className={`mt-2 text-xs font-medium ${isCompleted ? 'text-foreground' : 'text-muted-foreground'}`}>
@@ -154,7 +170,7 @@ export default function OrderDetailPage() {
           <CardContent className="space-y-4">
             {order.items.map((item, index) => (
               <div key={index} className="flex gap-3">
-                <div className="w-16 h-16 bg-muted rounded-lg" />
+                <div className="w-12 h-12 bg-muted rounded-lg flex-shrink-0" />
                 <div className="flex-1">
                   <p className="font-medium">{item.product_name}</p>
                   <p className="text-sm text-muted-foreground">SKU: {item.sku}</p>
@@ -234,7 +250,7 @@ export default function OrderDetailPage() {
 
           {/* Actions */}
           <div className="flex flex-col gap-2">
-            <Button variant="outline" className="w-full">
+            <Button variant="outline" className="w-full" onClick={handleDownloadInvoice}>
               <FileText className="w-4 h-4 mr-2" />
               Download Invoice
             </Button>

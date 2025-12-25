@@ -7,7 +7,9 @@ import { Badge } from '../../components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
 import { Switch } from '../../components/ui/switch';
+import { SingleImageUpload } from '../../components/ui/image-upload';
 import { bannersAPI } from '../../lib/api';
+import { getImageUrl } from '../../lib/utils';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Image as ImageIcon, Eye } from 'lucide-react';
 
@@ -127,17 +129,14 @@ export default function AdminBanners() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Image URL *</Label>
-                <Input
+                <Label>Banner Image *</Label>
+                <SingleImageUpload
                   value={formData.image_url}
-                  onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                  placeholder="https://..."
-                  className="input-admin"
-                  required
+                  onChange={(imageUrl) => setFormData({ ...formData, image_url: imageUrl })}
+                  folder="banners"
+                  label=""
+                  description="Upload banner image (recommended: 1200x400px)"
                 />
-                {formData.image_url && (
-                  <img src={formData.image_url} alt="Preview" className="w-full h-32 object-cover rounded-lg mt-2" />
-                )}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -205,7 +204,7 @@ export default function AdminBanners() {
                 banners.map((banner) => (
                   <TableRow key={banner.id} className="border-slate-700">
                     <TableCell>
-                      <img src={banner.image_url} alt="" className="w-32 h-16 object-cover rounded" />
+                      <img src={getImageUrl(banner.image_url)} alt="" className="w-32 h-16 object-cover rounded" />
                     </TableCell>
                     <TableCell className="font-medium">{banner.title}</TableCell>
                     <TableCell>{banner.position}</TableCell>

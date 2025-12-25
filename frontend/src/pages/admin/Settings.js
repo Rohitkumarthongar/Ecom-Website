@@ -5,9 +5,12 @@ import { Label } from '../../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Switch } from '../../components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
+import { Badge } from '../../components/ui/badge';
+import { SingleImageUpload } from '../../components/ui/image-upload';
 import { settingsAPI } from '../../lib/api';
+import { getImageUrl } from '../../lib/utils';
 import { toast } from 'sonner';
-import { Save, Building2, Image, Share2, CreditCard } from 'lucide-react';
+import { Save, Building2, Image, Share2, CreditCard, Mail, TestTube, AlertCircle, CheckCircle, Info } from 'lucide-react';
 
 export default function AdminSettings() {
   const [settings, setSettings] = useState({
@@ -29,11 +32,23 @@ export default function AdminSettings() {
     whatsapp_number: '',
     upi_id: '',
   });
+  const [emailSettings, setEmailSettings] = useState({
+    email_enabled: false,
+    smtp_host: 'smtp.gmail.com',
+    smtp_port: 587,
+    smtp_username: '',
+    smtp_from_email: '',
+    smtp_from_name: 'Amorlias Support',
+    smtp_password_configured: false,
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [testingEmail, setTestingEmail] = useState(false);
+  const [testEmail, setTestEmail] = useState('');
 
   useEffect(() => {
     fetchSettings();
+    fetchEmailSettings();
   }, []);
 
   const fetchSettings = async () => {
@@ -54,6 +69,18 @@ export default function AdminSettings() {
     }
   };
 
+  const fetchEmailSettings = async () => {
+    try {
+      const response = await settingsAPI.getEmailSettings();
+      if (response.data) {
+        setEmailSettings(response.data);
+        setTestEmail(response.data.smtp_from_email || '');
+      }
+    } catch (error) {
+      console.error('Failed to fetch email settings:', error);
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -62,10 +89,30 @@ export default function AdminSettings() {
         default_gst_rate: parseFloat(settings.default_gst_rate),
       });
       toast.success('Settings saved successfully');
+      
+      // Trigger settings update event for AdminLayout
+      window.dispatchEvent(new CustomEvent('settingsUpdated'));
     } catch (error) {
       toast.error('Failed to save settings');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleTestEmail = async () => {
+    if (!testEmail) {
+      toast.error('Please enter an email address to test');
+      return;
+    }
+    
+    setTestingEmail(true);
+    try {
+      const response = await settingsAPI.testEmail({ email: testEmail });
+      toast.success(`Email test completed! ${response.data.note}`);
+    } catch (error) {
+      toast.error('Failed to test email functionality');
+    } finally {
+      setTestingEmail(false);
     }
   };
 
@@ -103,6 +150,7 @@ export default function AdminSettings() {
           <TabsTrigger value="business">Business</TabsTrigger>
           <TabsTrigger value="branding">Branding</TabsTrigger>
           <TabsTrigger value="billing">Billing</TabsTrigger>
+          <TabsTrigger value="email">Email</TabsTrigger>
           <TabsTrigger value="social">Social & Links</TabsTrigger>
           <TabsTrigger value="payment">Payment</TabsTrigger>
         </TabsList>
@@ -229,40 +277,30 @@ export default function AdminSettings() {
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label>Logo URL</Label>
-                    <Input
+                    <Label>Logo</Label>
+                    <SingleImageUpload
                       value={settings.logo_url}
-                      onChange={(e) => setSettings({ ...settings, logo_url: e.target.value })}
-                      placeholder="https://your-domain.com/logo.png"
-                      className="input-admin"
+                      onChange={(imageUrl) => setSettings({ ...settings, logo_url: imageUrl })}
+                      folder="branding"
+                      imageType="logo"
+                      label=""
+                      description="Upload logo (any size - will be optimized to 400x120 max, aspect ratio preserved)"
                     />
-                    <p className="text-xs text-slate-400">Recommended: 200x60px PNG with transparent background</p>
                   </div>
-                  {settings.logo_url && (
-                    <div className="p-4 bg-slate-700/50 rounded-lg">
-                      <p className="text-xs text-slate-400 mb-2">Preview:</p>
-                      <img src={settings.logo_url} alt="Logo preview" className="max-h-16 object-contain" />
-                    </div>
-                  )}
                 </div>
 
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label>Favicon URL</Label>
-                    <Input
+                    <Label>Favicon</Label>
+                    <SingleImageUpload
                       value={settings.favicon_url}
-                      onChange={(e) => setSettings({ ...settings, favicon_url: e.target.value })}
-                      placeholder="https://your-domain.com/favicon.ico"
-                      className="input-admin"
+                      onChange={(imageUrl) => setSettings({ ...settings, favicon_url: imageUrl })}
+                      folder="branding"
+                      imageType="favicon"
+                      label=""
+                      description="Upload favicon (any size - will be optimized to 32x32 pixels)"
                     />
-                    <p className="text-xs text-slate-400">Recommended: 32x32px ICO or PNG</p>
                   </div>
-                  {settings.favicon_url && (
-                    <div className="p-4 bg-slate-700/50 rounded-lg">
-                      <p className="text-xs text-slate-400 mb-2">Preview:</p>
-                      <img src={settings.favicon_url} alt="Favicon preview" className="w-8 h-8 object-contain" />
-                    </div>
-                  )}
                 </div>
               </div>
             </CardContent>
@@ -318,6 +356,188 @@ export default function AdminSettings() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Email Configuration Tab */}
+        <TabsContent value="email">
+          <div className="space-y-6">
+            <Card className="bg-slate-800 border-slate-700">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Mail className="w-5 h-5" />
+                  Email Configuration
+                  <Badge variant={emailSettings.email_enabled ? "default" : "secondary"}>
+                    {emailSettings.email_enabled ? "Enabled" : "Disabled"}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Status Overview */}
+                <div className="grid md:grid-cols-3 gap-4">
+                  <div className="p-4 bg-slate-700/50 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      {emailSettings.email_enabled ? (
+                        <CheckCircle className="w-5 h-5 text-green-400" />
+                      ) : (
+                        <AlertCircle className="w-5 h-5 text-yellow-400" />
+                      )}
+                      <span className="font-medium">Email Status</span>
+                    </div>
+                    <p className="text-sm text-slate-400">
+                      {emailSettings.email_enabled ? "Email sending is enabled" : "Console logging only"}
+                    </p>
+                  </div>
+                  
+                  <div className="p-4 bg-slate-700/50 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      {emailSettings.smtp_password_configured ? (
+                        <CheckCircle className="w-5 h-5 text-green-400" />
+                      ) : (
+                        <AlertCircle className="w-5 h-5 text-red-400" />
+                      )}
+                      <span className="font-medium">SMTP Credentials</span>
+                    </div>
+                    <p className="text-sm text-slate-400">
+                      {emailSettings.smtp_password_configured ? "Password configured" : "Password not set"}
+                    </p>
+                  </div>
+                  
+                  <div className="p-4 bg-slate-700/50 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Info className="w-5 h-5 text-blue-400" />
+                      <span className="font-medium">SMTP Server</span>
+                    </div>
+                    <p className="text-sm text-slate-400">
+                      {emailSettings.smtp_host}:{emailSettings.smtp_port}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Current Configuration */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">Current Configuration</h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>SMTP Host</Label>
+                      <Input
+                        value={emailSettings.smtp_host}
+                        readOnly
+                        className="input-admin bg-slate-700/50"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>SMTP Port</Label>
+                      <Input
+                        value={emailSettings.smtp_port}
+                        readOnly
+                        className="input-admin bg-slate-700/50"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>SMTP Username</Label>
+                      <Input
+                        value={emailSettings.smtp_username}
+                        readOnly
+                        className="input-admin bg-slate-700/50"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>From Name</Label>
+                      <Input
+                        value={emailSettings.smtp_from_name}
+                        readOnly
+                        className="input-admin bg-slate-700/50"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Test Email Functionality */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">Test Email Functionality</h3>
+                  <div className="flex gap-4">
+                    <div className="flex-1">
+                      <Label>Test Email Address</Label>
+                      <Input
+                        value={testEmail}
+                        onChange={(e) => setTestEmail(e.target.value)}
+                        placeholder="your-email@example.com"
+                        className="input-admin"
+                      />
+                    </div>
+                    <div className="flex items-end">
+                      <Button
+                        onClick={handleTestEmail}
+                        disabled={testingEmail || !testEmail}
+                        variant="outline"
+                        className="bg-slate-700 border-slate-600 hover:bg-slate-600"
+                      >
+                        <TestTube className="w-4 h-4 mr-2" />
+                        {testingEmail ? 'Testing...' : 'Test Email'}
+                      </Button>
+                    </div>
+                  </div>
+                  <p className="text-sm text-slate-400">
+                    This will send test OTP and temporary password emails to verify your email configuration.
+                  </p>
+                </div>
+
+                {/* Configuration Instructions */}
+                <div className="p-4 bg-blue-900/20 border border-blue-800 rounded-lg">
+                  <h4 className="font-medium text-blue-300 mb-2">📧 Email Configuration Instructions</h4>
+                  <div className="text-sm text-slate-300 space-y-2">
+                    <p><strong>To enable email sending:</strong></p>
+                    <ol className="list-decimal list-inside space-y-1 ml-4">
+                      <li>Update your <code className="bg-slate-800 px-1 rounded">.env</code> file in the backend directory</li>
+                      <li>Set <code className="bg-slate-800 px-1 rounded">EMAIL_ENABLED=true</code></li>
+                      <li>Configure your SMTP credentials (Gmail App Password recommended)</li>
+                      <li>Restart the backend server</li>
+                      <li>Test the email functionality using the button above</li>
+                    </ol>
+                    <p className="mt-3">
+                      <strong>For Gmail:</strong> Enable 2-Factor Authentication and generate an App Password.
+                      <br />
+                      <strong>Current Status:</strong> {emailSettings.email_enabled ? 
+                        "✅ Emails will be sent via SMTP" : 
+                        "⚠️ Emails are logged to server console only"
+                      }
+                    </p>
+                  </div>
+                </div>
+
+                {/* Email Types */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">Email Types Sent by System</h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="p-4 bg-slate-700/30 rounded-lg">
+                      <h4 className="font-medium mb-2">🔐 OTP Verification</h4>
+                      <p className="text-sm text-slate-400">
+                        Sent when users request OTP for phone verification during registration or login.
+                      </p>
+                    </div>
+                    <div className="p-4 bg-slate-700/30 rounded-lg">
+                      <h4 className="font-medium mb-2">🔑 Temporary Password</h4>
+                      <p className="text-sm text-slate-400">
+                        Sent during registration and password reset requests with a temporary login password.
+                      </p>
+                    </div>
+                    <div className="p-4 bg-slate-700/30 rounded-lg">
+                      <h4 className="font-medium mb-2">📦 Order Notifications</h4>
+                      <p className="text-sm text-slate-400">
+                        Order confirmations and status updates (when implemented).
+                      </p>
+                    </div>
+                    <div className="p-4 bg-slate-700/30 rounded-lg">
+                      <h4 className="font-medium mb-2">🔔 System Notifications</h4>
+                      <p className="text-sm text-slate-400">
+                        Important system updates and admin notifications.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         {/* Social Links Tab */}

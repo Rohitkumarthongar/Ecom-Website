@@ -128,6 +128,8 @@ export const settingsAPI = {
   get: () => api.get('/admin/settings'),
   update: (data) => api.put('/admin/settings', data),
   getPublic: () => api.get('/settings/public'),
+  getEmailSettings: () => api.get('/admin/settings/email'),
+  testEmail: (data) => api.post('/admin/settings/email/test', data),
 };
 
 // Reports API
@@ -137,10 +139,25 @@ export const reportsAPI = {
   getProfitLoss: (params) => api.get('/admin/reports/profit-loss', { params }),
 };
 
+// Courier API
+export const courierAPI = {
+  checkPincode: (pincode) => api.get('/courier/pincode', { params: { pincode } }),
+  validateAddress: (addressData) => api.post('/courier/validate-address', addressData),
+  shipOrder: (orderId) => api.post(`/courier/ship/${orderId}`),
+  trackOrder: (orderId) => api.get(`/courier/track/${orderId}`),
+  trackByAwb: (awb) => api.get(`/courier/track-by-awb/${awb}`),
+  getLabel: (orderId) => api.get(`/courier/label/${orderId}`),
+  getInvoice: (orderId) => api.get(`/courier/invoice/${orderId}`),
+  cancelShipment: (orderId) => api.post(`/courier/cancel/${orderId}`),
+  createReturn: (orderId, returnData) => api.post(`/courier/create-return/${orderId}`, returnData),
+  getPicklist: (date) => api.get('/admin/picklist', { params: { date } }),
+};
+
 // Dashboard API
 export const dashboardAPI = {
   getStats: () => api.get('/admin/dashboard'),
   seedData: () => api.post('/admin/seed-data'),
+  clearData: () => api.post('/admin/reset-data'),
 };
 
 // Pages API
@@ -195,6 +212,27 @@ export const paymentAPI = {
 export const productLookupAPI = {
   bySku: (sku) => api.get('/products/lookup', { params: { sku } }),
   byBarcode: (barcode) => api.get('/products/lookup', { params: { barcode } }),
+};
+
+// Upload API
+export const uploadAPI = {
+  uploadImage: (file, folder = 'general') => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('folder', folder);
+    return api.post('/upload/image', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+  uploadMultiple: (files, folder = 'general') => {
+    const formData = new FormData();
+    files.forEach(file => formData.append('files', file));
+    formData.append('folder', folder);
+    return api.post('/upload/multiple', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+  deleteImage: (fileUrl) => api.delete('/upload/delete', { params: { file_url: fileUrl } }),
 };
 
 export default api;

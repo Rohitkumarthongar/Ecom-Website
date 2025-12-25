@@ -9,9 +9,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Textarea } from '../../components/ui/textarea';
 import { Switch } from '../../components/ui/switch';
+import { MultipleImageUpload } from '../../components/ui/image-upload';
 import { productsAPI, categoriesAPI } from '../../lib/api';
+import { getImageUrl } from '../../lib/utils';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Search, Package, Eye } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Package, Eye, Upload, Download, FileSpreadsheet } from 'lucide-react';
 
 export default function AdminProducts() {
   const [products, setProducts] = useState([]);
@@ -19,7 +21,10 @@ export default function AdminProducts() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showDialog, setShowDialog] = useState(false);
+  const [showBulkDialog, setShowBulkDialog] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [bulkUploading, setBulkUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
   
   const [formData, setFormData] = useState({
     name: '',
@@ -144,6 +149,192 @@ export default function AdminProducts() {
     }
   };
 
+  const downloadTemplate = () => {
+    // Create a more comprehensive template with examples
+    const csvHeaders = [
+      'name', 'sku', 'description', 'category_id', 'mrp', 'selling_price', 'cost_price',
+      'wholesale_price', 'wholesale_min_qty', 'stock_qty', 'low_stock_threshold', 'gst_rate', 'hsn_code', 'is_active'
+    ];
+    
+    const sampleData = [
+      [
+        'Sample T-Shirt',
+        'TSH001',
+        'Comfortable cotton t-shirt for daily wear',
+        categories.length > 0 ? categories[0].id : 'category-id-here',
+        '800',
+        '650',
+        '400',
+        '500',
+        '10',
+        '100',
+        '10',
+        '12',
+        'HSN6109',
+        'true'
+      ],
+      [
+        'Premium Jeans',
+        'JNS001',
+        'High-quality denim jeans with perfect fit',
+        categories.length > 1 ? categories[1].id : 'category-id-here',
+        '2000',
+        '1600',
+        '1200',
+        '1400',
+        '5',
+        '50',
+        '5',
+        '12',
+        'HSN6203',
+        'true'
+      ]
+    ];
+    
+    const csvContent = [
+      csvHeaders.join(','),
+      ...sampleData.map(row => row.join(','))
+    ].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'products_bulk_upload_template.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+    toast.success('Template downloaded with sample data');
+  };
+
+  const handleBulkUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.csv')) {
+      toast.error('Please upload a CSV file');
+      return;
+    }
+
+    setBulkUploading(true);
+    setUploadProgress({ current: 0, total: 0 });
+    
+    try {
+      const text = await file.text();
+      const lines = text.split('\n').filter(line => line.trim());
+      
+      if (lines.length < 2) {
+        toast.error('CSV file must contain at least a header and one data row');
+        return;
+      }
+
+      setUploadProgress({ current: 1, total: 4 }); // Step 1: File read
+
+      // Simple CSV parser that handles quoted fields
+      const parseCSVLine = (line) => {
+        const result = [];
+        let current = '';
+        let inQuotes = false;
+        
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i];
+          
+          if (char === '"') {
+            inQuotes = !inQuotes;
+          } else if (char === ',' && !inQuotes) {
+            result.push(current.trim());
+            current = '';
+          } else {
+            current += char;
+          }
+        }
+        result.push(current.trim());
+        return result;
+      };
+
+      const headers = parseCSVLine(lines[0]).map(h => h.replace(/"/g, '').trim());
+      const products = [];
+      let skippedRows = 0;
+
+      setUploadProgress({ current: 2, total: 4 }); // Step 2: Parsing
+
+      for (let i = 1; i < lines.length; i++) {
+        const values = parseCSVLine(lines[i]).map(v => v.replace(/"/g, '').trim());
+        if (values.length !== headers.length) {
+          skippedRows++;
+          continue;
+        }
+
+        const product = {};
+        headers.forEach((header, index) => {
+          const value = values[index];
+          
+          // Convert data types
+          if (['mrp', 'selling_price', 'cost_price', 'wholesale_price', 'gst_rate'].includes(header)) {
+            product[header] = value && value !== '' ? parseFloat(value) : null;
+          } else if (['wholesale_min_qty', 'stock_qty', 'low_stock_threshold'].includes(header)) {
+            product[header] = value && value !== '' ? parseInt(value) : (header === 'wholesale_min_qty' ? 10 : header === 'low_stock_threshold' ? 10 : 0);
+          } else if (header === 'is_active') {
+            product[header] = value.toLowerCase() === 'true' || value === '1';
+          } else {
+            product[header] = value || (header === 'gst_rate' ? 18 : null);
+          }
+        });
+
+        // Validate required fields
+        if (product.name && product.sku && product.mrp && product.selling_price && product.cost_price) {
+          // Set default values for optional fields
+          if (!product.gst_rate) product.gst_rate = 18;
+          if (!product.wholesale_min_qty) product.wholesale_min_qty = 10;
+          if (!product.low_stock_threshold) product.low_stock_threshold = 10;
+          if (product.stock_qty === null) product.stock_qty = 0;
+          if (product.is_active === undefined) product.is_active = true;
+          
+          products.push(product);
+        } else {
+          skippedRows++;
+        }
+      }
+
+      if (products.length === 0) {
+        toast.error('No valid products found in CSV file. Please check required fields: name, sku, mrp, selling_price, cost_price');
+        return;
+      }
+
+      setUploadProgress({ current: 3, total: 4 }); // Step 3: Validation complete
+
+      const response = await productsAPI.bulkUpload(products);
+      
+      setUploadProgress({ current: 4, total: 4 }); // Step 4: Upload complete
+      
+      let message = `Successfully processed ${products.length} products`;
+      if (response.data?.created) message += ` (${response.data.created} created`;
+      if (response.data?.updated) message += `, ${response.data.updated} updated)`;
+      else if (response.data?.created) message += ')';
+      
+      if (skippedRows > 0) {
+        message += ` • ${skippedRows} rows skipped due to missing required fields`;
+      }
+      
+      if (response.data?.errors && response.data.errors.length > 0) {
+        message += ` • ${response.data.errors.length} errors occurred`;
+        console.warn('Bulk upload errors:', response.data.errors);
+      }
+      
+      toast.success(message);
+      setShowBulkDialog(false);
+      fetchData();
+      
+      // Reset file input
+      event.target.value = '';
+    } catch (error) {
+      console.error('Bulk upload error:', error);
+      toast.error(error.response?.data?.detail || 'Failed to upload products. Please check your CSV format.');
+    } finally {
+      setBulkUploading(false);
+      setUploadProgress({ current: 0, total: 0 });
+    }
+  };
+
   const filteredProducts = products.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
     p.sku.toLowerCase().includes(search.toLowerCase())
@@ -156,14 +347,123 @@ export default function AdminProducts() {
           <h1 className="text-2xl font-bold">Products</h1>
           <p className="text-slate-400">{products.length} products</p>
         </div>
-        <Dialog open={showDialog} onOpenChange={(open) => { setShowDialog(open); if (!open) resetForm(); }}>
-          <DialogTrigger asChild>
-            <Button className="btn-admin bg-primary hover:bg-primary/90" data-testid="add-product-btn">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Product
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-slate-800 border-slate-700">
+        <div className="flex gap-2">
+          <Dialog open={showBulkDialog} onOpenChange={setShowBulkDialog}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="btn-admin">
+                <Upload className="w-4 h-4 mr-2" />
+                Bulk Upload
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg bg-slate-800 border-slate-700">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Upload className="w-5 h-5" />
+                  Bulk Upload Products
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-6">
+                <div className="text-sm text-slate-400">
+                  Upload multiple products at once using a CSV file. Follow these steps:
+                </div>
+                
+                <div className="space-y-4">
+                  <div className="flex items-start gap-3 p-3 bg-slate-700/30 rounded-lg">
+                    <div className="w-6 h-6 rounded-full bg-primary text-white text-xs flex items-center justify-center font-bold">1</div>
+                    <div>
+                      <p className="font-medium text-sm">Download Template</p>
+                      <p className="text-xs text-slate-400">Get the CSV template with sample data and correct format</p>
+                      <Button 
+                        onClick={downloadTemplate}
+                        variant="outline" 
+                        size="sm"
+                        className="mt-2"
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        Download Template
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3 p-3 bg-slate-700/30 rounded-lg">
+                    <div className="w-6 h-6 rounded-full bg-primary text-white text-xs flex items-center justify-center font-bold">2</div>
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">Fill Your Data</p>
+                      <p className="text-xs text-slate-400">Edit the template with your product information</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-3 p-3 bg-slate-700/30 rounded-lg">
+                    <div className="w-6 h-6 rounded-full bg-primary text-white text-xs flex items-center justify-center font-bold">3</div>
+                    <div className="flex-1">
+                      <p className="font-medium text-sm">Upload CSV File</p>
+                      <p className="text-xs text-slate-400">Select your completed CSV file to upload</p>
+                      <div className="mt-2">
+                        <Input
+                          type="file"
+                          accept=".csv"
+                          onChange={handleBulkUpload}
+                          disabled={bulkUploading}
+                          className="input-admin"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {bulkUploading && (
+                    <div className="space-y-3 p-4 bg-blue-900/20 border border-blue-800 rounded-lg">
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                        <span className="text-sm text-blue-300">
+                          {uploadProgress.current === 1 && "Reading CSV file..."}
+                          {uploadProgress.current === 2 && "Parsing product data..."}
+                          {uploadProgress.current === 3 && "Validating products..."}
+                          {uploadProgress.current === 4 && "Uploading to server..."}
+                        </span>
+                      </div>
+                      {uploadProgress.total > 0 && (
+                        <div className="w-full bg-slate-700 rounded-full h-2">
+                          <div 
+                            className="bg-blue-500 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
+                          ></div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-3 text-xs text-slate-500 bg-slate-700/20 p-3 rounded-lg">
+                  <div>
+                    <p className="font-medium text-slate-400 mb-1">Required Fields:</p>
+                    <p>name, sku, mrp, selling_price, cost_price</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-400 mb-1">Optional Fields:</p>
+                    <p>description, category_id, wholesale_price, wholesale_min_qty, stock_qty, low_stock_threshold, gst_rate, hsn_code, is_active</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-400 mb-1">Tips:</p>
+                    <ul className="list-disc list-inside space-y-1">
+                      <li>Use the "View Category IDs" button to get valid category IDs</li>
+                      <li>Set is_active to 'true' or 'false'</li>
+                      <li>GST rate defaults to 18% if not specified</li>
+                      <li>Stock quantity defaults to 0 if not specified</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+          
+          <Dialog open={showDialog} onOpenChange={(open) => { setShowDialog(open); if (!open) resetForm(); }}>
+            <DialogTrigger asChild>
+              <Button className="btn-admin bg-primary hover:bg-primary/90" data-testid="add-product-btn">
+                <Plus className="w-4 h-4 mr-2" />
+                Add Product
+              </Button>
+            </DialogTrigger>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto scrollbar-invisible bg-slate-800 border-slate-700">
             <DialogHeader>
               <DialogTitle>{editingProduct ? 'Edit Product' : 'Add New Product'}</DialogTitle>
             </DialogHeader>
@@ -323,12 +623,14 @@ export default function AdminProducts() {
               </div>
 
               <div className="space-y-2">
-                <Label>Image URL</Label>
-                <Input
-                  value={formData.images[0] || ''}
-                  onChange={(e) => setFormData({ ...formData, images: e.target.value ? [e.target.value] : [] })}
-                  placeholder="https://..."
-                  className="input-admin"
+                <Label>Product Images</Label>
+                <MultipleImageUpload
+                  value={formData.images}
+                  onChange={(images) => setFormData({ ...formData, images })}
+                  folder="products"
+                  maxFiles={5}
+                  label=""
+                  description="Upload product images (max 5 images, 5MB each)"
                 />
               </div>
 
@@ -351,18 +653,47 @@ export default function AdminProducts() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Search */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <Input
-          placeholder="Search products..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-10 input-admin"
-          data-testid="product-search"
-        />
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Input
+            placeholder="Search products..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10 input-admin"
+            data-testid="product-search"
+          />
+        </div>
+        
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="outline" size="sm" className="text-xs">
+              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              View Category IDs
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-md bg-slate-800 border-slate-700">
+            <DialogHeader>
+              <DialogTitle>Category IDs Reference</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              <p className="text-sm text-slate-400 mb-3">Use these IDs in your CSV file:</p>
+              {categories.map((category) => (
+                <div key={category.id} className="flex justify-between items-center p-2 bg-slate-700/50 rounded text-sm">
+                  <span>{category.name}</span>
+                  <code className="bg-slate-600 px-2 py-1 rounded text-xs">{category.id}</code>
+                </div>
+              ))}
+              {categories.length === 0 && (
+                <p className="text-sm text-slate-500">No categories found. Create categories first.</p>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Products Table */}
@@ -398,7 +729,7 @@ export default function AdminProducts() {
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-slate-700 rounded-lg overflow-hidden">
                           {product.images?.[0] && (
-                            <img src={product.images[0]} alt="" className="w-full h-full object-cover" />
+                            <img src={getImageUrl(product.images[0])} alt="" className="w-full h-full object-cover" />
                           )}
                         </div>
                         <span className="font-medium truncate max-w-[200px]">{product.name}</span>

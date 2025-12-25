@@ -16,7 +16,8 @@ import {
   Sun, Moon, Store, ChevronRight, RefreshCcw, FileText, Warehouse
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { cn } from '../lib/utils';
+import { cn, getImageUrl } from '../lib/utils';
+import api from '../lib/api';
 
 const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/admin' },
@@ -24,14 +25,16 @@ const menuItems = [
   { icon: Tag, label: 'Categories', path: '/admin/categories' },
   { icon: Warehouse, label: 'Inventory', path: '/admin/inventory' },
   { icon: ShoppingCart, label: 'Orders', path: '/admin/orders' },
+  { icon: Truck, label: 'Shipping', path: '/admin/shipping' },
   { icon: Store, label: 'Offline Sales (POS)', path: '/admin/pos' },
   { icon: RefreshCcw, label: 'Returns', path: '/admin/returns' },
   { icon: ImageIcon, label: 'Banners', path: '/admin/banners' },
   { icon: Percent, label: 'Offers', path: '/admin/offers' },
-  { icon: Truck, label: 'Couriers', path: '/admin/couriers' },
+  { icon: Settings, label: 'Couriers', path: '/admin/couriers' },
   { icon: CreditCard, label: 'Payment Gateways', path: '/admin/payments' },
   { icon: BarChart3, label: 'Reports', path: '/admin/reports' },
   { icon: FileText, label: 'Pages', path: '/admin/pages' },
+  { icon: Users, label: 'Team', path: '/admin/team' },
   { icon: Settings, label: 'Settings', path: '/admin/settings' },
 ];
 
@@ -42,6 +45,33 @@ export default function AdminLayout({ children }) {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [settings, setSettings] = useState(null);
+
+  const fetchSettings = async () => {
+    try {
+      const response = await api.get('/settings/public');
+      console.log('Fetched settings:', response.data); // Debug log
+      setSettings(response.data);
+    } catch (error) {
+      console.error('Failed to fetch settings:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchSettings();
+
+    // Listen for settings updates
+    const handleSettingsUpdate = () => {
+      setTimeout(() => {
+        fetchSettings(); // Add small delay to ensure backend is updated
+      }, 500);
+    };
+
+    window.addEventListener('settingsUpdated', handleSettingsUpdate);
+    return () => {
+      window.removeEventListener('settingsUpdated', handleSettingsUpdate);
+    };
+  }, []);
 
   // Force dark theme for admin
   useEffect(() => {
@@ -110,11 +140,15 @@ export default function AdminLayout({ children }) {
           <div className="h-16 flex items-center justify-between px-4 border-b border-slate-700">
             {!collapsed && (
               <Link to="/admin" className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-xl gradient-hero flex items-center justify-center">
-                  <span className="text-white font-extrabold text-xl">B</span>
-                </div>
+                {settings?.logo_url ? (
+                  <img src={getImageUrl(settings.logo_url)} alt="Logo" className="h-10 w-auto object-contain rounded-lg" />
+                ) : (
+                  <div className="w-10 h-10 rounded-xl gradient-hero flex items-center justify-center">
+                    <span className="text-white font-extrabold text-xl">{settings?.business_name?.[0] || 'B'}</span>
+                  </div>
+                )}
                 <div>
-                  <span className="font-bold block">BharatBazaar</span>
+                  <span className="font-bold block">{settings?.business_name || 'Amorlias'}</span>
                   <span className="text-xs text-slate-400">Admin Panel</span>
                 </div>
               </Link>
@@ -130,7 +164,7 @@ export default function AdminLayout({ children }) {
           </div>
 
           {/* Navigation */}
-          <ScrollArea className="flex-1 py-4">
+          <ScrollArea className="flex-1 py-4 scrollbar-invisible">
             <nav className="px-2 space-y-1">
               {menuItems.map((item) => (
                 <Link
@@ -193,18 +227,22 @@ export default function AdminLayout({ children }) {
         {/* Mobile Sidebar Overlay */}
         {sidebarOpen && (
           <div className="lg:hidden fixed inset-0 z-50">
-            <div 
-              className="absolute inset-0 bg-black/60" 
-              onClick={() => setSidebarOpen(false)} 
+            <div
+              className="absolute inset-0 bg-black/60"
+              onClick={() => setSidebarOpen(false)}
             />
             <aside className="absolute left-0 top-0 h-full w-72 bg-slate-800 border-r border-slate-700">
               <div className="h-16 flex items-center justify-between px-4 border-b border-slate-700">
                 <Link to="/admin" className="flex items-center gap-2">
-                  <div className="w-10 h-10 rounded-xl gradient-hero flex items-center justify-center">
-                    <span className="text-white font-extrabold text-xl">B</span>
-                  </div>
+                  {settings?.logo_url ? (
+                    <img src={getImageUrl(settings.logo_url)} alt="Logo" className="h-10 w-auto object-contain rounded-lg" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-xl gradient-hero flex items-center justify-center">
+                      <span className="text-white font-extrabold text-xl">{settings?.business_name?.[0] || 'B'}</span>
+                    </div>
+                  )}
                   <div>
-                    <span className="font-bold block">BharatBazaar</span>
+                    <span className="font-bold block">{settings?.business_name || 'Amorlias'}</span>
                     <span className="text-xs text-slate-400">Admin Panel</span>
                   </div>
                 </Link>
@@ -216,7 +254,7 @@ export default function AdminLayout({ children }) {
                   <X className="w-5 h-5" />
                 </Button>
               </div>
-              <ScrollArea className="h-[calc(100vh-4rem)]">
+              <ScrollArea className="h-[calc(100vh-4rem)] scrollbar-invisible">
                 <nav className="p-4 space-y-1">
                   {menuItems.map((item) => (
                     <Link

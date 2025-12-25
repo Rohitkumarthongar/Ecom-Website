@@ -6,6 +6,7 @@ import { Card } from '../components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Star, Minus, Plus, ShoppingCart, Heart, Share2, Truck, Shield, RefreshCcw, ChevronLeft } from 'lucide-react';
 import { productsAPI } from '../lib/api';
+import { getImageUrl } from '../lib/utils';
 import { useCart } from '../contexts/CartContext';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'sonner';
@@ -14,7 +15,7 @@ export default function ProductDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { addItem } = useCart();
-  const { isWholesale } = useAuth();
+  const { isWholesale, user } = useAuth();
 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -67,7 +68,11 @@ export default function ProductDetailPage() {
 
   const handleBuyNow = () => {
     addItem(product, quantity);
-    navigate('/checkout');
+    if (user) {
+      navigate('/checkout');
+    } else {
+      navigate('/login?redirect=/checkout');
+    }
   };
 
   return (
@@ -86,22 +91,21 @@ export default function ProductDetailPage() {
         <div className="space-y-4">
           <div className="aspect-square rounded-2xl overflow-hidden bg-muted">
             <img
-              src={product.images?.[selectedImage] || 'https://images.unsplash.com/photo-1624927637280-f033784c1279?w=800'}
+              src={getImageUrl(product.images?.[selectedImage]) || 'https://images.unsplash.com/photo-1624927637280-f033784c1279?w=800'}
               alt={product.name}
               className="w-full h-full object-cover"
             />
           </div>
           {product.images?.length > 1 && (
-            <div className="flex gap-2 overflow-x-auto pb-2">
+            <div className="flex gap-2 overflow-x-auto scrollbar-invisible pb-2">
               {product.images.map((img, index) => (
                 <button
                   key={index}
                   onClick={() => setSelectedImage(index)}
-                  className={`w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all ${
-                    selectedImage === index ? 'border-primary' : 'border-transparent'
-                  }`}
+                  className={`w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 border-2 transition-all ${selectedImage === index ? 'border-primary' : 'border-transparent'
+                    }`}
                 >
-                  <img src={img} alt="" className="w-full h-full object-cover" />
+                  <img src={getImageUrl(img)} alt="" className="w-full h-full object-cover" />
                 </button>
               ))}
             </div>
@@ -122,7 +126,7 @@ export default function ProductDetailPage() {
           </div>
 
           <h1 className="text-2xl md:text-3xl font-bold">{product.name}</h1>
-          
+
           <div className="flex items-center gap-2 mt-2">
             <div className="flex items-center gap-1">
               {[...Array(5)].map((_, i) => (
@@ -148,8 +152,8 @@ export default function ProductDetailPage() {
             {showWholesale && (
               <div className="mt-2 p-3 bg-[#5b21b6]/10 rounded-lg border border-[#5b21b6]/20">
                 <p className="text-sm font-medium text-[#5b21b6]">
-                  {qualifiesForWholesale 
-                    ? '✓ Wholesale price applied!' 
+                  {qualifiesForWholesale
+                    ? '✓ Wholesale price applied!'
                     : `Add ${product.wholesale_min_qty - quantity} more for wholesale price of ₹${product.wholesale_price.toLocaleString()}`
                   }
                 </p>

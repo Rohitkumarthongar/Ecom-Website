@@ -1,0 +1,6 @@
+name,sku,description,category_id,mrp,selling_price,cost_price,wholesale_price,wholesale_min_qty,stock_qty,low_stock_threshold,gst_rate,hsn_code,is_active
+"Premium Cotton T-Shirt",TSH001,"Comfortable 100% cotton t-shirt available in multiple colors",,800,650,400,500,10,100,10,12,HSN6109,true
+"Denim Jeans Classic",JNS001,"High-quality denim jeans with perfect fit and durability",,2000,1600,1200,1400,5,50,5,12,HSN6203,true
+"Wireless Bluetooth Headphones",HDN001,"Premium wireless headphones with noise cancellation and 20hr battery",,5000,3500,2500,3000,3,25,5,18,HSN8518,true
+"Smartphone Case",CSE001,"Protective case for smartphones with shock absorption",,500,350,200,250,20,200,20,18,HSN3926,true
+"Coffee Mug Ceramic",MUG001,"Beautiful ceramic coffee mug perfect for daily use",,300,250,150,200,50,500,50,12,HSN6912,true

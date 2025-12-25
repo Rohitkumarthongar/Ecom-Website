@@ -127,12 +127,12 @@ export default function OrdersPage() {
                   </div>
 
                   {/* Item Previews */}
-                  <div className="flex gap-2 mt-4 overflow-x-auto pb-2">
+                  <div className="flex gap-2 mt-4 overflow-x-auto scrollbar-invisible pb-2">
                     {order.items.slice(0, 4).map((item, index) => (
-                      <div key={index} className="w-16 h-16 bg-muted rounded-lg flex-shrink-0" />
+                      <div key={index} className="w-12 h-12 bg-muted rounded-lg flex-shrink-0" />
                     ))}
                     {order.items.length > 4 && (
-                      <div className="w-16 h-16 bg-muted rounded-lg flex-shrink-0 flex items-center justify-center text-sm font-medium">
+                      <div className="w-12 h-12 bg-muted rounded-lg flex-shrink-0 flex items-center justify-center text-xs font-medium">
                         +{order.items.length - 4}
                       </div>
                     )}
