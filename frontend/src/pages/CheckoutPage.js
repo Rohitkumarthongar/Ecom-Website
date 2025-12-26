@@ -89,7 +89,11 @@ export default function CheckoutPage() {
 
   const subtotal = getSubtotal();
   const gstAmount = subtotal * 0.18; // Simplified GST calculation
-  const deliveryFee = subtotal >= 499 ? 0 : 40;
+
+  // Delivery fee from pincode verification or default
+  const deliveryFee = pincodeVerification.result?.delivery_charge !== undefined
+    ? pincodeVerification.result.delivery_charge
+    : (subtotal >= 499 ? 0 : 40);
 
   // Calculate discount
   let discountAmount = 0;
@@ -425,21 +429,15 @@ export default function CheckoutPage() {
                       )}
                     </div>
 
-                    {/* Pincode Verification Status */}
                     {pincodeVerification.result && (
                       <div className={`p-3 rounded-lg text-sm ${pincodeVerification.result.serviceable
                         ? 'bg-green-500/10 border border-green-500/20 text-green-700 dark:text-green-300'
                         : 'bg-red-500/10 border border-red-500/20 text-red-700 dark:text-red-300'
                         }`}>
                         {pincodeVerification.result.serviceable ? (
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <CheckCircle className="w-4 h-4" />
-                              <span className="font-medium">Delivery Available</span>
-                            </div>
-                            <p><strong>Location:</strong> {pincodeVerification.result.city}, {pincodeVerification.result.state}</p>
-                            <p><strong>COD:</strong> {pincodeVerification.result.cod ? 'Available' : 'Not Available'}</p>
-                            <p><strong>Estimated Delivery:</strong> 2-4 business days</p>
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="w-4 h-4" />
+                            <span className="font-medium">Delivery Available</span>
                           </div>
                         ) : (
                           <div className="flex items-center gap-2">
@@ -537,6 +535,7 @@ export default function CheckoutPage() {
                     <span>₹{gstAmount.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
+                    <span className="text-muted-foreground">Delivery Charges</span>
                     <span className={deliveryFee === 0 ? 'text-emerald-600' : ''}>
                       {deliveryFee === 0 ? 'FREE' : `₹${deliveryFee}`}
                     </span>

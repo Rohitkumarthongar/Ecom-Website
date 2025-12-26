@@ -21,7 +21,7 @@ import {
   Facebook, Instagram, Twitter, Youtube, Phone
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import api from '../lib/api';
+import api, { categoriesAPI } from '../lib/api';
 import { getImageUrl } from '../lib/utils';
 
 export const StoreHeader = () => {
@@ -34,10 +34,21 @@ export const StoreHeader = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [settings, setSettings] = useState(null);
+  const [categories, setCategories] = useState([]);
 
   useEffect(() => {
     fetchSettings();
+    fetchCategories();
   }, []);
+
+  const fetchCategories = async () => {
+    try {
+      const response = await categoriesAPI.getAll();
+      setCategories(response.data || []);
+    } catch (error) {
+      console.error('Failed to fetch categories:', error);
+    }
+  };
 
   const fetchSettings = async () => {
     try {
@@ -327,12 +338,18 @@ export const StoreHeader = () => {
       {/* Categories Bar */}
       <nav className="border-t bg-background/50 hidden md:block">
         <div className="max-w-7xl mx-auto px-4">
-          <ul className="flex items-center gap-6 text-sm font-medium py-2">
-            <li><Link to="/products" className="text-muted-foreground hover:text-primary transition-colors">All Products</Link></li>
-            <li><Link to="/products?category=fashion" className="text-muted-foreground hover:text-primary transition-colors">Fashion</Link></li>
-            <li><Link to="/products?category=electronics" className="text-muted-foreground hover:text-primary transition-colors">Electronics</Link></li>
-            <li><Link to="/products?category=home" className="text-muted-foreground hover:text-primary transition-colors">Home & Kitchen</Link></li>
-            <li><Link to="/products?category=beauty" className="text-muted-foreground hover:text-primary transition-colors">Beauty</Link></li>
+          <ul className="flex items-center gap-6 text-sm font-medium py-2 overflow-x-auto scrollbar-hide">
+            <li><Link to="/products" className="text-muted-foreground hover:text-primary transition-colors whitespace-nowrap">All Products</Link></li>
+            {categories.map((category) => (
+              <li key={category.id}>
+                <Link
+                  to={`/products?category=${category.id}`}
+                  className="text-muted-foreground hover:text-primary transition-colors whitespace-nowrap"
+                >
+                  {category.name}
+                </Link>
+              </li>
+            ))}
           </ul>
         </div>
       </nav>

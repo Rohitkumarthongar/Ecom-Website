@@ -215,7 +215,7 @@ export default function ProductDetailPage() {
           </div>
 
           <div className="flex gap-4 mt-4">
-            <WishlistButton 
+            <WishlistButton
               product={product}
               variant="ghost"
               size="sm"
@@ -286,6 +286,24 @@ export default function ProductDetailPage() {
                 <div className="flex justify-between py-2 border-b">
                   <dt className="text-muted-foreground">Weight</dt>
                   <dd>{product.weight} kg</dd>
+                </div>
+              )}
+              {product.color && (
+                <div className="flex justify-between py-2 border-b">
+                  <dt className="text-muted-foreground">Color</dt>
+                  <dd>{product.color}</dd>
+                </div>
+              )}
+              {product.material && (
+                <div className="flex justify-between py-2 border-b">
+                  <dt className="text-muted-foreground">Material</dt>
+                  <dd>{product.material}</dd>
+                </div>
+              )}
+              {product.origin && (
+                <div className="flex justify-between py-2 border-b">
+                  <dt className="text-muted-foreground">Country of Origin</dt>
+                  <dd>{product.origin}</dd>
                 </div>
               )}
             </dl>

@@ -256,7 +256,7 @@ export default function HomePage() {
                 data-testid={`category-${category.id}`}
               >
                 <img
-                  src={category.image_url || 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=500'}
+                  src={getImageUrl(category.image_url) || 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=500'}
                   alt={category.name}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />

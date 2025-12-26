@@ -79,7 +79,6 @@ class Product(Base):
     gst_rate = Column(Float, default=18.0)
     hsn_code = Column(String(20), nullable=True)
     weight = Column(Float, nullable=True)
-    weight = Column(Float, nullable=True)
     color = Column(String(50), nullable=True)
     material = Column(String(100), nullable=True)
     origin = Column(String(100), nullable=True)

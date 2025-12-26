@@ -44,7 +44,8 @@ class DelhiveryService:
                             "district": item.get("district"),
                             "cash_pickup": item.get("cash_pickup") == "Y",
                             "pickup": item.get("pickup") == "Y",
-                            "repl": item.get("repl") == "Y"
+                            "repl": item.get("repl") == "Y",
+                            "delivery_charge": 40 if item.get("state_code") == "RJ" else 80
                         }
                         
             # If API call fails or pincode not found, return mock data for testing
@@ -61,6 +62,7 @@ class DelhiveryService:
                 "cash_pickup": True,
                 "pickup": True,
                 "repl": True,
+                "delivery_charge": 60,
                 "note": "Mock data - API may be unavailable"
             }
             
@@ -75,6 +77,7 @@ class DelhiveryService:
                 "city": "Test City",
                 "state": "Test State",
                 "district": "Test District",
+                "delivery_charge": 60,
                 "note": f"Mock data - Error: {str(e)}"
             }
 

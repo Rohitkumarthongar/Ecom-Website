@@ -5169,31 +5169,6 @@ def delete_offer(offer_id: str, admin: dict = Depends(admin_required), db: Sessi
 
 # ============ UPLOAD ENDPOINTS ============
 
-@api_router.post("/upload/image")
-async def upload_single_image(
-    file: UploadFile = File(...),
-    folder: str = "general",
-    image_type: Optional[str] = None,
-    admin: dict = Depends(admin_required)
-):
-    """Upload a single image file"""
-    try:
-        # Validate file type
-        if not file.content_type or not file.content_type.startswith('image/'):
-            raise HTTPException(status_code=400, detail="File must be an image")
-        
-        # Save the uploaded file
-        file_url = save_uploaded_file(file, folder, image_type)
-        
-        return {
-            "message": "Image uploaded successfully",
-            "url": file_url,
-            "filename": file.filename
-        }
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to upload image: {str(e)}")
-
 @api_router.post("/upload/multiple")
 async def upload_multiple_images(
     files: List[UploadFile] = File(...),
