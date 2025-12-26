@@ -8,7 +8,9 @@ import { Star, Minus, Plus, ShoppingCart, Heart, Share2, Truck, Shield, RefreshC
 import { productsAPI } from '../lib/api';
 import { getImageUrl } from '../lib/utils';
 import { useCart } from '../contexts/CartContext';
+import { useWishlist } from '../contexts/WishlistContext';
 import { useAuth } from '../contexts/AuthContext';
+import WishlistButton from '../components/WishlistButton';
 import { toast } from 'sonner';
 
 export default function ProductDetailPage() {
@@ -213,10 +215,12 @@ export default function ProductDetailPage() {
           </div>
 
           <div className="flex gap-4 mt-4">
-            <Button variant="ghost" size="sm">
-              <Heart className="w-4 h-4 mr-2" />
-              Add to Wishlist
-            </Button>
+            <WishlistButton 
+              product={product}
+              variant="ghost"
+              size="sm"
+              showText={true}
+            />
             <Button variant="ghost" size="sm">
               <Share2 className="w-4 h-4 mr-2" />
               Share

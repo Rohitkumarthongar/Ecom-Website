@@ -10,13 +10,15 @@ import { Switch } from '../../components/ui/switch';
 import { couriersAPI } from '../../lib/api';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Truck } from 'lucide-react';
+import { usePopup } from '../../contexts/PopupContext';
 
 export default function AdminCouriers() {
   const [couriers, setCouriers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
   const [editingCourier, setEditingCourier] = useState(null);
-  
+  const { showPopup } = usePopup();
+
   const [formData, setFormData] = useState({
     name: '',
     api_key: '',
@@ -90,14 +92,20 @@ export default function AdminCouriers() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Delete this courier?')) return;
-    try {
-      await couriersAPI.delete(id);
-      toast.success('Courier deleted');
-      fetchCouriers();
-    } catch (error) {
-      toast.error('Failed to delete courier');
-    }
+    showPopup({
+      title: "Delete Courier",
+      message: "Are you sure you want to delete this courier?",
+      type: "error",
+      onConfirm: async () => {
+        try {
+          await couriersAPI.delete(id);
+          toast.success('Courier deleted');
+          fetchCouriers();
+        } catch (error) {
+          toast.error('Failed to delete courier');
+        }
+      }
+    });
   };
 
   return (

@@ -4,9 +4,13 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Separator } from '../components/ui/separator';
-import { ordersAPI } from '../lib/api';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Textarea } from '../components/ui/textarea';
+import { Label } from '../components/ui/label';
+import { ordersAPI, returnsAPI } from '../lib/api';
 import { toast } from 'sonner';
-import { Package, Truck, CheckCircle, Clock, ChevronLeft, MapPin, Phone, FileText, Printer } from 'lucide-react';
+import { Package, Truck, CheckCircle, Clock, ChevronLeft, MapPin, Phone, FileText, Printer, X, RefreshCw, Upload } from 'lucide-react';
 
 const statusSteps = [
   { key: 'pending', label: 'Order Placed', icon: Clock },
@@ -20,6 +24,17 @@ export default function OrderDetailPage() {
   const navigate = useNavigate();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showReturnDialog, setShowReturnDialog] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [returnData, setReturnData] = useState({
+    returnType: '',
+    reason: '',
+    refundMethod: 'original'
+  });
+  const [evidenceFiles, setEvidenceFiles] = useState([]);
+  const [cancellationEligibility, setCancellationEligibility] = useState(null);
+  const [returnEligibility, setReturnEligibility] = useState(null);
 
   useEffect(() => {
     fetchOrder();
@@ -35,6 +50,97 @@ export default function OrderDetailPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const checkCancellationEligibility = async () => {
+    try {
+      const response = await ordersAPI.checkCancellationEligibility(id);
+      setCancellationEligibility(response.data);
+    } catch (error) {
+      console.error('Failed to check cancellation eligibility:', error);
+    }
+  };
+
+  const checkReturnEligibility = async () => {
+    try {
+      const response = await ordersAPI.checkReturnEligibility(id);
+      setReturnEligibility(response.data);
+    } catch (error) {
+      console.error('Failed to check return eligibility:', error);
+    }
+  };
+
+  const handleCancelOrder = async () => {
+    if (!cancelReason.trim()) {
+      toast.error('Please provide a reason for cancellation');
+      return;
+    }
+
+    try {
+      const response = await ordersAPI.cancelOrder(id, {
+        order_id: id,
+        reason: cancelReason,
+        cancellation_type: 'customer'
+      });
+      
+      toast.success(response.data.message);
+      setShowCancelDialog(false);
+      fetchOrder(); // Refresh order data
+    } catch (error) {
+      toast.error('Failed to cancel order');
+    }
+  };
+
+  const handleCreateReturn = async () => {
+    if (!returnData.returnType || !returnData.reason.trim()) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      const returnPayload = {
+        order_id: id,
+        items: order.items, // Return all items for now
+        reason: returnData.reason,
+        return_type: returnData.returnType,
+        refund_method: returnData.refundMethod,
+        description: returnData.reason
+      };
+
+      const response = await ordersAPI.createReturn(id, returnPayload);
+      
+      // Upload evidence files if any
+      if (evidenceFiles.length > 0) {
+        const formData = new FormData();
+        evidenceFiles.forEach(file => {
+          formData.append('files', file);
+        });
+        
+        try {
+          await returnsAPI.uploadEvidence(response.data.return_id, formData);
+          toast.success('Return request submitted with evidence');
+        } catch (evidenceError) {
+          toast.success('Return request submitted (evidence upload failed)');
+        }
+      } else {
+        toast.success(response.data.message);
+      }
+      
+      setShowReturnDialog(false);
+      setReturnData({ returnType: '', reason: '', refundMethod: 'original' });
+      setEvidenceFiles([]);
+    } catch (error) {
+      toast.error('Failed to create return request');
+    }
+  };
+
+  const handleFileChange = (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length > 5) {
+      toast.error('Maximum 5 files allowed');
+      return;
+    }
+    setEvidenceFiles(files);
   };
 
   const handleDownloadInvoice = async () => {
@@ -254,14 +360,193 @@ export default function OrderDetailPage() {
               <FileText className="w-4 h-4 mr-2" />
               Download Invoice
             </Button>
+            
+            {/* Cancellation Button */}
+            {order.status !== 'delivered' && order.status !== 'cancelled' && order.status !== 'returned' && (
+              <Button 
+                variant="outline" 
+                className="w-full text-red-600 hover:text-red-700 hover:bg-red-50" 
+                onClick={() => {
+                  checkCancellationEligibility();
+                  setShowCancelDialog(true);
+                }}
+              >
+                <X className="w-4 h-4 mr-2" />
+                Cancel Order
+              </Button>
+            )}
+            
+            {/* Return Button */}
             {order.status === 'delivered' && (
-              <Button variant="outline" className="w-full">
+              <Button 
+                variant="outline" 
+                className="w-full text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                onClick={() => {
+                  checkReturnEligibility();
+                  setShowReturnDialog(true);
+                }}
+              >
+                <RefreshCw className="w-4 h-4 mr-2" />
                 Request Return
               </Button>
             )}
           </div>
         </div>
       </div>
+
+      {/* Cancel Order Dialog */}
+      <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cancel Order</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {cancellationEligibility && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>Refund Amount:</strong> ₹{cancellationEligibility.refund_amount?.toLocaleString()}
+                </p>
+                <p className="text-sm text-blue-800">
+                  <strong>Refund Timeline:</strong> {cancellationEligibility.refund_timeline}
+                </p>
+              </div>
+            )}
+            
+            <div className="space-y-2">
+              <Label htmlFor="cancelReason">Reason for Cancellation</Label>
+              <Select value={cancelReason} onValueChange={setCancelReason}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a reason" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Changed my mind">Changed my mind</SelectItem>
+                  <SelectItem value="Found better price elsewhere">Found better price elsewhere</SelectItem>
+                  <SelectItem value="No longer needed">No longer needed</SelectItem>
+                  <SelectItem value="Ordered by mistake">Ordered by mistake</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowCancelDialog(false)}>
+                Keep Order
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={handleCancelOrder}
+                disabled={!cancelReason}
+              >
+                Cancel Order
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Return Request Dialog */}
+      <Dialog open={showReturnDialog} onOpenChange={setShowReturnDialog}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Request Return</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {returnEligibility && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-sm text-green-800">
+                  <strong>Return Window:</strong> {returnEligibility.return_window_remaining}
+                </p>
+                <p className="text-sm text-green-800">
+                  <strong>Refund Timeline:</strong> {returnEligibility.refund_timeline}
+                </p>
+              </div>
+            )}
+            
+            <div className="space-y-2">
+              <Label htmlFor="returnType">Return Type</Label>
+              <Select 
+                value={returnData.returnType} 
+                onValueChange={(value) => setReturnData({...returnData, returnType: value})}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select return type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="defective">Product is defective/damaged</SelectItem>
+                  <SelectItem value="wrong_item">Wrong item received</SelectItem>
+                  <SelectItem value="not_satisfied">Not satisfied with product</SelectItem>
+                  <SelectItem value="damaged">Package was damaged</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="returnReason">Detailed Reason</Label>
+              <Textarea
+                id="returnReason"
+                placeholder="Please describe the issue in detail..."
+                value={returnData.reason}
+                onChange={(e) => setReturnData({...returnData, reason: e.target.value})}
+                rows={3}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="refundMethod">Refund Method</Label>
+              <Select 
+                value={returnData.refundMethod} 
+                onValueChange={(value) => setReturnData({...returnData, refundMethod: value})}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="original">Original payment method</SelectItem>
+                  <SelectItem value="bank_transfer">Bank transfer</SelectItem>
+                  <SelectItem value="store_credit">Store credit</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="evidence">Upload Evidence (Optional)</Label>
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                <input
+                  type="file"
+                  id="evidence"
+                  multiple
+                  accept="image/*,video/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+                <label htmlFor="evidence" className="cursor-pointer">
+                  <Upload className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                  <p className="text-sm text-gray-600">
+                    Click to upload photos or videos (Max 5 files)
+                  </p>
+                </label>
+                {evidenceFiles.length > 0 && (
+                  <div className="mt-2 text-sm text-green-600">
+                    {evidenceFiles.length} file(s) selected
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowReturnDialog(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleCreateReturn}
+                disabled={!returnData.returnType || !returnData.reason.trim()}
+              >
+                Submit Return Request
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

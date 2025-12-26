@@ -8,9 +8,9 @@ import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 import { Separator } from '../components/ui/separator';
 import { useCart } from '../contexts/CartContext';
 import { useAuth } from '../contexts/AuthContext';
-import { ordersAPI } from '../lib/api';
+import { ordersAPI, courierAPI, offersAPI } from '../lib/api';
 import { toast } from 'sonner';
-import { CreditCard, Truck, Shield, ChevronLeft, Smartphone, Banknote, Building } from 'lucide-react';
+import { CreditCard, Truck, Shield, ChevronLeft, Smartphone, Banknote, Building, MapPin, CheckCircle, AlertCircle, Clock, Tag, X } from 'lucide-react';
 
 export default function CheckoutPage() {
   const navigate = useNavigate();
@@ -18,6 +18,16 @@ export default function CheckoutPage() {
   const { user, isWholesale, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('cod');
+  const [pincodeVerification, setPincodeVerification] = useState({
+    checking: false,
+    result: null,
+    error: null
+  });
+
+  // Coupon State
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponLoading, setCouponLoading] = useState(false);
 
   const [address, setAddress] = useState({
     name: user?.name || '',
@@ -80,10 +90,108 @@ export default function CheckoutPage() {
   const subtotal = getSubtotal();
   const gstAmount = subtotal * 0.18; // Simplified GST calculation
   const deliveryFee = subtotal >= 499 ? 0 : 40;
-  const total = subtotal + gstAmount + deliveryFee;
+
+  // Calculate discount
+  let discountAmount = 0;
+  if (appliedCoupon) {
+    if (appliedCoupon.discount_type === 'percentage') {
+      discountAmount = (subtotal * appliedCoupon.discount_value) / 100;
+      if (appliedCoupon.max_discount && discountAmount > appliedCoupon.max_discount) {
+        discountAmount = appliedCoupon.max_discount;
+      }
+    } else {
+      discountAmount = appliedCoupon.discount_value;
+    }
+  }
+
+  const total = Math.max(0, subtotal + gstAmount + deliveryFee - discountAmount);
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) {
+      toast.error('Please enter a coupon code');
+      return;
+    }
+
+    setCouponLoading(true);
+    try {
+      const response = await offersAPI.getAll();
+      const offers = response.data || [];
+      const coupon = offers.find(o => o.coupon_code === couponCode.trim() && o.is_active);
+
+      if (!coupon) {
+        toast.error('Invalid coupon code');
+        setAppliedCoupon(null);
+        return;
+      }
+
+      // Validate requirements
+      if (subtotal < coupon.min_order_value) {
+        toast.error(`Minimum order value of ₹${coupon.min_order_value} required`);
+        setAppliedCoupon(null);
+        return;
+      }
+
+      if (coupon.end_date && new Date(coupon.end_date) < new Date()) {
+        toast.error('Coupon has expired');
+        setAppliedCoupon(null);
+        return;
+      }
+
+      setAppliedCoupon(coupon);
+      toast.success('Coupon applied successfully!');
+    } catch (error) {
+      console.error('Failed to validate coupon:', error);
+      toast.error('Failed to validate coupon');
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode('');
+    toast.info('Coupon removed');
+  };
 
   const handleAddressChange = (field, value) => {
     setAddress(prev => ({ ...prev, [field]: value }));
+
+    // Auto-verify pincode when user enters 6 digits
+    if (field === 'pincode' && value.length === 6 && /^\d{6}$/.test(value)) {
+      verifyPincode(value);
+    } else if (field === 'pincode' && value.length < 6) {
+      // Reset verification when pincode is incomplete
+      setPincodeVerification({ checking: false, result: null, error: null });
+    }
+  };
+
+  const verifyPincode = async (pincode) => {
+    setPincodeVerification({ checking: true, result: null, error: null });
+
+    try {
+      const response = await courierAPI.checkPincode(pincode);
+      const result = response.data;
+
+      setPincodeVerification({
+        checking: false,
+        result: result,
+        error: null
+      });
+
+      if (result.serviceable) {
+        toast.success(`✅ Delivery available to ${result.city}, ${result.state}`);
+      } else {
+        toast.error(`❌ Sorry, we don't deliver to pincode ${pincode}`);
+      }
+    } catch (error) {
+      console.error('Pincode verification error:', error);
+      setPincodeVerification({
+        checking: false,
+        result: null,
+        error: 'Failed to verify pincode'
+      });
+      toast.error('Failed to verify pincode. Please try again.');
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -91,6 +199,25 @@ export default function CheckoutPage() {
 
     if (!address.name || !address.phone || !address.line1 || !address.city || !address.pincode) {
       toast.error('Please fill all required address fields');
+      return;
+    }
+
+    // Check if pincode is verified and serviceable
+    if (address.pincode.length === 6) {
+      if (pincodeVerification.result === null) {
+        toast.error('Please wait for pincode verification to complete');
+        return;
+      }
+
+      if (pincodeVerification.result && !pincodeVerification.result.serviceable) {
+        toast.error('Cannot place order. Delivery not available to this pincode.');
+        return;
+      }
+    }
+
+    // Validate COD availability if COD is selected
+    if (paymentMethod === 'cod' && pincodeVerification.result && !pincodeVerification.result.cod) {
+      toast.error('Cash on Delivery not available for this pincode. Please select online payment.');
       return;
     }
 
@@ -166,6 +293,42 @@ export default function CheckoutPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="grid gap-4">
+                {/* Saved Addresses Selector */}
+                {user?.addresses && user.addresses.length > 0 && (
+                  <div className="mb-2">
+                    <Label className="text-xs text-muted-foreground mb-1 block">Quick Fill from Saved Addresses</Label>
+                    <select
+                      className="w-full p-2 border rounded-md text-sm bg-background"
+                      onChange={(e) => {
+                        const idx = e.target.value;
+                        if (idx !== "") {
+                          const addr = user.addresses[idx];
+                          setAddress(prev => ({
+                            ...prev,
+                            name: user.name || prev.name,
+                            phone: user.phone || prev.phone,
+                            line1: addr.line1 || '',
+                            line2: addr.line2 || '',
+                            city: addr.city || '',
+                            state: addr.state || '',
+                            pincode: addr.pincode || ''
+                          }));
+                          // Trigger pincode verify if valid
+                          if (addr.pincode && addr.pincode.length === 6) verifyPincode(addr.pincode);
+                        }
+                      }}
+                      defaultValue=""
+                    >
+                      <option value="" disabled>Select a saved address...</option>
+                      {user.addresses.map((addr, idx) => (
+                        <option key={idx} value={idx}>
+                          {addr.line1}, {addr.city} - {addr.pincode}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="name">Full Name *</Label>
@@ -234,14 +397,67 @@ export default function CheckoutPage() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="pincode">Pincode *</Label>
-                    <Input
-                      id="pincode"
-                      value={address.pincode}
-                      onChange={(e) => handleAddressChange('pincode', e.target.value.replace(/\D/g, '').slice(0, 6))}
-                      placeholder="6-digit PIN"
-                      required
-                      data-testid="checkout-pincode"
-                    />
+                    <div className="relative">
+                      <Input
+                        id="pincode"
+                        value={address.pincode}
+                        onChange={(e) => handleAddressChange('pincode', e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        placeholder="6-digit PIN"
+                        required
+                        data-testid="checkout-pincode"
+                        className={`pr-10 ${pincodeVerification.result?.serviceable === false ? 'border-red-500' :
+                          pincodeVerification.result?.serviceable === true ? 'border-green-500' : ''
+                          }`}
+                      />
+                      {pincodeVerification.checking && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                      )}
+                      {pincodeVerification.result && !pincodeVerification.checking && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          {pincodeVerification.result.serviceable ? (
+                            <CheckCircle className="w-4 h-4 text-green-500" />
+                          ) : (
+                            <AlertCircle className="w-4 h-4 text-red-500" />
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Pincode Verification Status */}
+                    {pincodeVerification.result && (
+                      <div className={`p-3 rounded-lg text-sm ${pincodeVerification.result.serviceable
+                        ? 'bg-green-500/10 border border-green-500/20 text-green-700 dark:text-green-300'
+                        : 'bg-red-500/10 border border-red-500/20 text-red-700 dark:text-red-300'
+                        }`}>
+                        {pincodeVerification.result.serviceable ? (
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle className="w-4 h-4" />
+                              <span className="font-medium">Delivery Available</span>
+                            </div>
+                            <p><strong>Location:</strong> {pincodeVerification.result.city}, {pincodeVerification.result.state}</p>
+                            <p><strong>COD:</strong> {pincodeVerification.result.cod ? 'Available' : 'Not Available'}</p>
+                            <p><strong>Estimated Delivery:</strong> 2-4 business days</p>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4" />
+                            <span className="font-medium">Delivery Not Available</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {pincodeVerification.error && (
+                      <div className="p-3 rounded-lg text-sm bg-yellow-500/10 border border-yellow-500/20 text-yellow-700 dark:text-yellow-300">
+                        <div className="flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4" />
+                          <span>Unable to verify pincode. Please contact support.</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -321,11 +537,50 @@ export default function CheckoutPage() {
                     <span>₹{gstAmount.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Delivery</span>
                     <span className={deliveryFee === 0 ? 'text-emerald-600' : ''}>
                       {deliveryFee === 0 ? 'FREE' : `₹${deliveryFee}`}
                     </span>
                   </div>
+
+                  {/* Coupon Input */}
+                  <div className="pt-2 pb-2">
+                    {!appliedCoupon ? (
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Coupon Code"
+                          value={couponCode}
+                          onChange={(e) => setCouponCode(e.target.value)}
+                          className="h-9"
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleApplyCoupon}
+                          disabled={couponLoading || !couponCode}
+                          className="h-9"
+                        >
+                          {couponLoading ? '...' : 'Apply'}
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="bg-green-50 border border-green-200 rounded-md p-2 flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-green-700">
+                          <Tag className="w-4 h-4" />
+                          <span className="font-medium text-xs">Code {appliedCoupon.coupon_code} applied</span>
+                        </div>
+                        <button onClick={removeCoupon} className="text-green-700 hover:text-green-900">
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {appliedCoupon && (
+                    <div className="flex justify-between text-green-600 font-medium">
+                      <span>Discount</span>
+                      <span>-₹{Math.round(discountAmount).toLocaleString()}</span>
+                    </div>
+                  )}
                 </div>
 
                 <Separator />

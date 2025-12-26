@@ -9,11 +9,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Slider } from '../components/ui/slider';
 import { Checkbox } from '../components/ui/checkbox';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../components/ui/sheet';
-import { Star, Filter, Grid3X3, LayoutGrid, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { Star, Filter, Grid3X3, LayoutGrid, ChevronLeft, ChevronRight, X, Heart } from 'lucide-react';
 import { productsAPI, categoriesAPI } from '../lib/api';
 import { getImageUrl } from '../lib/utils';
 import { useCart } from '../contexts/CartContext';
+import { useWishlist } from '../contexts/WishlistContext';
 import { useAuth } from '../contexts/AuthContext';
+import WishlistButton from '../components/WishlistButton';
 
 const ProductCard = ({ product, view }) => {
   const { addItem } = useCart();
@@ -78,6 +80,11 @@ const ProductCard = ({ product, view }) => {
         {showWholesale && (
           <Badge className="absolute top-2 right-2 wholesale-badge">Wholesale</Badge>
         )}
+        {/* Wishlist Button */}
+        <WishlistButton
+          product={product}
+          className={`absolute top-2 ${showWholesale ? 'right-20' : 'right-2'} opacity-0 group-hover:opacity-100 transition-opacity`}
+        />
       </div>
       <div className="p-3">
         <h3 className="font-medium text-sm line-clamp-2 group-hover:text-primary transition-colors">

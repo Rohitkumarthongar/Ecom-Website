@@ -102,12 +102,20 @@
     @apply bg-slate-800 border border-slate-700 p-6 rounded-xl flex flex-col justify-between hover:border-slate-600 transition-colors duration-200;
   }
 
+  .light .card-stat {
+    @apply bg-white border border-slate-200 hover:border-slate-300;
+  }
+
   .input-store {
     @apply h-12 rounded-lg border-gray-300 focus:border-[#f43397] focus:ring-[#f43397] bg-gray-50 focus:bg-white transition-colors duration-200;
   }
 
   .input-admin {
     @apply h-10 rounded-md border-slate-700 bg-slate-900 text-white focus:border-indigo-500 focus:ring-indigo-500;
+  }
+
+  .light .input-admin {
+    @apply border-slate-300 bg-white text-slate-900 focus:border-indigo-500 focus:ring-indigo-500;
   }
 
   .gradient-hero {

@@ -29,9 +29,12 @@ export default function AdminReturns() {
     try {
       const params = statusFilter !== 'all' ? { status: statusFilter } : {};
       const response = await returnsAPI.getAll(params);
-      setReturns(response.data || []);
+      // Backend returns { returns: [...], total, page, pages }
+      setReturns(response.data.returns || []);
     } catch (error) {
       console.error('Failed to fetch returns:', error);
+      toast.error('Failed to fetch returns');
+      setReturns([]); // Set empty array on error
     } finally {
       setLoading(false);
     }

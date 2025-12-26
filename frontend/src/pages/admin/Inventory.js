@@ -87,7 +87,7 @@ export default function AdminInventory() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, index) => (
-          <Card key={index} className="card-stat">
+          <Card key={index} className="bg-slate-800 border-slate-700">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-slate-700/50">
                 <stat.icon className={`w-5 h-5 ${stat.color}`} />
@@ -171,8 +171,8 @@ export default function AdminInventory() {
                       <TableCell>
                         <Badge className={
                           isOut ? 'bg-red-500/20 text-red-400' :
-                          isLow ? 'bg-amber-500/20 text-amber-400' :
-                          'bg-emerald-500/20 text-emerald-400'
+                            isLow ? 'bg-amber-500/20 text-amber-400' :
+                              'bg-emerald-500/20 text-emerald-400'
                         }>
                           {isOut ? 'Out of Stock' : isLow ? 'Low Stock' : 'In Stock'}
                         </Badge>

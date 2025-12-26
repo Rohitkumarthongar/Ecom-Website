@@ -22,13 +22,13 @@ export default function AdminReports() {
     try {
       const fromDate = new Date();
       fromDate.setDate(fromDate.getDate() - parseInt(dateRange));
-      
+
       const [salesRes, inventoryRes, profitRes] = await Promise.all([
         reportsAPI.getSales({ date_from: fromDate.toISOString() }),
         reportsAPI.getInventory(),
         reportsAPI.getProfitLoss({ date_from: fromDate.toISOString() }),
       ]);
-      
+
       setSalesReport(salesRes.data);
       setInventoryReport(inventoryRes.data);
       setProfitReport(profitRes.data);
@@ -40,7 +40,7 @@ export default function AdminReports() {
   };
 
   const StatCard = ({ title, value, icon: Icon, color, subtext }) => (
-    <Card className="card-stat">
+    <Card className="bg-slate-800 border-slate-700">
       <div className="flex items-start justify-between">
         <div className={`p-2 rounded-lg bg-slate-700/50`}>
           <Icon className={`w-5 h-5 ${color}`} />

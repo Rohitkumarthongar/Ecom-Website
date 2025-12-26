@@ -13,13 +13,15 @@ import { categoriesAPI } from '../../lib/api';
 import { getImageUrl } from '../../lib/utils';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, FolderTree } from 'lucide-react';
+import { usePopup } from '../../contexts/PopupContext';
 
 export default function AdminCategories() {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
-  
+  const { showPopup } = usePopup();
+
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -65,7 +67,7 @@ export default function AdminCategories() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     try {
       if (editingCategory) {
         await categoriesAPI.update(editingCategory.id, formData);
@@ -83,15 +85,20 @@ export default function AdminCategories() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this category?')) return;
-    
-    try {
-      await categoriesAPI.delete(id);
-      toast.success('Category deleted');
-      fetchCategories();
-    } catch (error) {
-      toast.error('Failed to delete category');
-    }
+    showPopup({
+      title: "Delete Category",
+      message: "Are you sure you want to delete this category?",
+      type: "error",
+      onConfirm: async () => {
+        try {
+          await categoriesAPI.delete(id);
+          toast.success('Category deleted');
+          fetchCategories();
+        } catch (error) {
+          toast.error('Failed to delete category');
+        }
+      }
+    });
   };
 
   return (

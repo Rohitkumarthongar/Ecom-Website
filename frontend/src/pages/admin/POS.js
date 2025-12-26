@@ -147,10 +147,13 @@ export default function AdminPOS() {
 
   const generateQR = async () => {
     try {
-      const response = await paymentAPI.getQR(getTotal());
+      const orderNumber = `POS${Date.now()}`;
+      const customerName = customer?.name || customerPhone || 'Customer';
+      const response = await paymentAPI.getQR(getTotal(), customerName, orderNumber);
       setQrData(response.data);
       setShowQRDialog(true);
     } catch (error) {
+      console.error('QR Generation Error:', error);
       toast.error('Failed to generate QR');
     }
   };
@@ -563,10 +566,17 @@ export default function AdminPOS() {
           {qrData && (
             <div className="text-center">
               <div className="bg-white p-4 rounded-lg inline-block mb-4">
-                {/* QR Code would be rendered here - using placeholder */}
-                <div className="w-48 h-48 bg-gray-100 flex items-center justify-center">
-                  <QrCode className="w-24 h-24 text-gray-400" />
-                </div>
+                {qrData.qr_code ? (
+                  <img 
+                    src={qrData.qr_code} 
+                    alt="Payment QR Code" 
+                    className="w-48 h-48"
+                  />
+                ) : (
+                  <div className="w-48 h-48 bg-gray-100 flex items-center justify-center">
+                    <QrCode className="w-24 h-24 text-gray-400" />
+                  </div>
+                )}
               </div>
               <p className="text-xl font-bold text-primary mb-2">₹{qrData.amount.toFixed(2)}</p>
               <p className="text-sm text-slate-400 mb-4">UPI ID: {qrData.upi_id}</p>

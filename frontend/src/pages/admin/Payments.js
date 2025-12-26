@@ -11,13 +11,15 @@ import { Switch } from '../../components/ui/switch';
 import { paymentGatewaysAPI } from '../../lib/api';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, CreditCard } from 'lucide-react';
+import { usePopup } from '../../contexts/PopupContext';
 
 export default function AdminPayments() {
   const [gateways, setGateways] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
   const [editingGateway, setEditingGateway] = useState(null);
-  
+  const { showPopup } = usePopup();
+
   const [formData, setFormData] = useState({
     name: 'phonepe',
     merchant_id: '',
@@ -87,14 +89,20 @@ export default function AdminPayments() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Delete this payment gateway?')) return;
-    try {
-      await paymentGatewaysAPI.delete(id);
-      toast.success('Gateway deleted');
-      fetchGateways();
-    } catch (error) {
-      toast.error('Failed to delete gateway');
-    }
+    showPopup({
+      title: "Delete Payment Gateway",
+      message: "Are you sure you want to delete this payment gateway?",
+      type: "error",
+      onConfirm: async () => {
+        try {
+          await paymentGatewaysAPI.delete(id);
+          toast.success('Gateway deleted');
+          fetchGateways();
+        } catch (error) {
+          toast.error('Failed to delete gateway');
+        }
+      }
+    });
   };
 
   const gatewayOptions = [

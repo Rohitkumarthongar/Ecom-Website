@@ -4,10 +4,11 @@ import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from '../components/ui/carousel';
-import { Star, ChevronRight, Truck, Shield, RefreshCcw, Headphones } from 'lucide-react';
-import { productsAPI, categoriesAPI, bannersAPI } from '../lib/api';
+import { Star, ChevronRight, Truck, Shield, RefreshCcw, Headphones, Tag, Copy } from 'lucide-react';
+import { productsAPI, categoriesAPI, bannersAPI, offersAPI } from '../lib/api';
 import { useCart } from '../contexts/CartContext';
 import { useAuth } from '../contexts/AuthContext';
+import { getImageUrl } from '../lib/utils';
 
 const ProductCard = ({ product }) => {
   const { addItem } = useCart();
@@ -18,7 +19,7 @@ const ProductCard = ({ product }) => {
   const showWholesale = isWholesale && product.wholesale_price;
 
   return (
-    <Card 
+    <Card
       className="card-product group cursor-pointer"
       onClick={() => navigate(`/products/${product.id}`)}
       data-testid={`product-card-${product.id}`}
@@ -70,6 +71,7 @@ export default function HomePage() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [banners, setBanners] = useState([]);
+  const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -79,14 +81,16 @@ export default function HomePage() {
 
   const fetchData = async () => {
     try {
-      const [productsRes, categoriesRes, bannersRes] = await Promise.all([
+      const [productsRes, categoriesRes, bannersRes, offersRes] = await Promise.all([
         productsAPI.getAll({ limit: 12 }),
         categoriesAPI.getAll(),
         bannersAPI.getAll(),
+        offersAPI.getAll(),
       ]);
       setProducts(productsRes.data.products || []);
       setCategories(categoriesRes.data || []);
       setBanners(bannersRes.data || []);
+      setOffers(offersRes.data || []);
     } catch (error) {
       console.error('Failed to fetch data:', error);
     } finally {
@@ -112,7 +116,7 @@ export default function HomePage() {
                 <CarouselItem key={banner.id || index}>
                   <div className="relative aspect-[21/9] md:aspect-[3/1]">
                     <img
-                      src={banner.image_url}
+                      src={getImageUrl(banner.image_url)}
                       alt={banner.title}
                       className="w-full h-full object-cover"
                     />
@@ -121,7 +125,7 @@ export default function HomePage() {
                         <h1 className="text-3xl md:text-5xl lg:text-6xl font-extrabold text-white max-w-lg">
                           {banner.title}
                         </h1>
-                        <Button 
+                        <Button
                           onClick={() => navigate(banner.link || '/products')}
                           className="mt-6 btn-primary"
                         >
@@ -146,7 +150,7 @@ export default function HomePage() {
               <p className="text-white/80 mt-4 text-lg max-w-md">
                 Shop from thousands of products at wholesale prices
               </p>
-              <Button 
+              <Button
                 onClick={() => navigate('/products')}
                 className="mt-6 bg-white text-primary hover:bg-white/90 rounded-full px-8 py-3 font-bold"
               >
@@ -157,6 +161,63 @@ export default function HomePage() {
           </div>
         )}
       </section>
+
+      {/* Offers Section */}
+      {
+        offers.length > 0 && (
+          <section className="py-8 bg-primary/5">
+            <div className="max-w-7xl mx-auto px-4">
+              <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+                <Tag className="w-6 h-6 text-primary" />
+                Exciting Offers
+              </h2>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {offers.filter(offer => offer.is_active).map((offer, index) => (
+                  <Card key={offer.id || index} className="overflow-hidden border-primary/20">
+                    <div className="p-6">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h3 className="font-bold text-lg">{offer.title}</h3>
+                          <p className="text-sm text-muted-foreground mt-1">{offer.description}</p>
+                        </div>
+                        <Badge className="bg-primary text-primary-foreground text-lg px-3 py-1">
+                          {offer.discount_type === 'percentage' ? `${offer.discount_value}% OFF` : `₹${offer.discount_value} OFF`}
+                        </Badge>
+                      </div>
+
+                      {offer.coupon_code && (
+                        <div className="bg-muted p-3 rounded-lg flex items-center justify-between mt-4 border border-dashed border-primary/30">
+                          <div className="text-sm">
+                            <span className="text-muted-foreground">Use Code:</span>
+                            <span className="font-mono font-bold ml-2 text-primary">{offer.coupon_code}</span>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8"
+                            onClick={() => {
+                              navigator.clipboard.writeText(offer.coupon_code);
+                              // Toast notification would be good here
+                            }}
+                          >
+                            <Copy className="w-4 h-4 mr-2" />
+                            Copy
+                          </Button>
+                        </div>
+                      )}
+
+                      <div className="mt-4 pt-4 border-t flex justify-between items-center text-xs text-muted-foreground semi-bold">
+                        <span>Min. Order: ₹{offer.min_order_value}</span>
+                        {offer.end_date && <span>Valid till: {new Date(offer.end_date).toLocaleDateString()}</span>}
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          </section>
+        )
+      }
 
       {/* Features */}
       <section className="py-8 border-b">
@@ -245,7 +306,7 @@ export default function HomePage() {
               <p className="text-white/80 mb-6">
                 Register with your GST number and unlock exclusive wholesale prices on bulk orders. Save up to 40% on every purchase!
               </p>
-              <Button 
+              <Button
                 onClick={() => navigate('/register')}
                 className="bg-white text-[#5b21b6] hover:bg-white/90 rounded-full px-8 py-3 font-bold"
               >
@@ -269,6 +330,6 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-    </div>
+    </div >
   );
 }

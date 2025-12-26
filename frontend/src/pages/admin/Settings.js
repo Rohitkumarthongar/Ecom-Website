@@ -15,6 +15,7 @@ import { Save, Building2, Image, Share2, CreditCard, Mail, TestTube, AlertCircle
 export default function AdminSettings() {
   const [settings, setSettings] = useState({
     business_name: '',
+    company_name: '',
     gst_number: '',
     phone: '',
     email: '',
@@ -174,6 +175,16 @@ export default function AdminSettings() {
                     placeholder="Your Business Name"
                     className="input-admin"
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label>Company Name</Label>
+                  <Input
+                    value={settings.company_name}
+                    onChange={(e) => setSettings({ ...settings, company_name: e.target.value })}
+                    placeholder="Company Name for Invoices & Labels"
+                    className="input-admin"
+                  />
+                  <p className="text-xs text-slate-400">This name will appear on invoices and shipping labels</p>
                 </div>
                 <div className="space-y-2">
                   <Label>GST Number</Label>

@@ -14,6 +14,7 @@ import { productsAPI, categoriesAPI } from '../../lib/api';
 import { getImageUrl } from '../../lib/utils';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Search, Package, Eye, Upload, Download, FileSpreadsheet } from 'lucide-react';
+import { usePopup } from '../../contexts/PopupContext';
 
 export default function AdminProducts() {
   const [products, setProducts] = useState([]);
@@ -25,7 +26,8 @@ export default function AdminProducts() {
   const [editingProduct, setEditingProduct] = useState(null);
   const [bulkUploading, setBulkUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
-  
+  const { showPopup } = usePopup();
+
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -108,7 +110,7 @@ export default function AdminProducts() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     const payload = {
       ...formData,
       mrp: parseFloat(formData.mrp),
@@ -138,15 +140,20 @@ export default function AdminProducts() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this product?')) return;
-    
-    try {
-      await productsAPI.delete(id);
-      toast.success('Product deleted');
-      fetchData();
-    } catch (error) {
-      toast.error('Failed to delete product');
-    }
+    showPopup({
+      title: "Delete Product",
+      message: "Are you sure you want to delete this product?",
+      type: "error",
+      onConfirm: async () => {
+        try {
+          await productsAPI.delete(id);
+          toast.success('Product deleted');
+          fetchData();
+        } catch (error) {
+          toast.error('Failed to delete product');
+        }
+      }
+    });
   };
 
   const downloadTemplate = () => {
@@ -155,7 +162,7 @@ export default function AdminProducts() {
       'name', 'sku', 'description', 'category_id', 'mrp', 'selling_price', 'cost_price',
       'wholesale_price', 'wholesale_min_qty', 'stock_qty', 'low_stock_threshold', 'gst_rate', 'hsn_code', 'is_active'
     ];
-    
+
     const sampleData = [
       [
         'Sample T-Shirt',
@@ -190,12 +197,12 @@ export default function AdminProducts() {
         'true'
       ]
     ];
-    
+
     const csvContent = [
       csvHeaders.join(','),
       ...sampleData.map(row => row.join(','))
     ].join('\n');
-    
+
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -217,11 +224,11 @@ export default function AdminProducts() {
 
     setBulkUploading(true);
     setUploadProgress({ current: 0, total: 0 });
-    
+
     try {
       const text = await file.text();
       const lines = text.split('\n').filter(line => line.trim());
-      
+
       if (lines.length < 2) {
         toast.error('CSV file must contain at least a header and one data row');
         return;
@@ -234,10 +241,10 @@ export default function AdminProducts() {
         const result = [];
         let current = '';
         let inQuotes = false;
-        
+
         for (let i = 0; i < line.length; i++) {
           const char = line[i];
-          
+
           if (char === '"') {
             inQuotes = !inQuotes;
           } else if (char === ',' && !inQuotes) {
@@ -267,7 +274,7 @@ export default function AdminProducts() {
         const product = {};
         headers.forEach((header, index) => {
           const value = values[index];
-          
+
           // Convert data types
           if (['mrp', 'selling_price', 'cost_price', 'wholesale_price', 'gst_rate'].includes(header)) {
             product[header] = value && value !== '' ? parseFloat(value) : null;
@@ -288,7 +295,7 @@ export default function AdminProducts() {
           if (!product.low_stock_threshold) product.low_stock_threshold = 10;
           if (product.stock_qty === null) product.stock_qty = 0;
           if (product.is_active === undefined) product.is_active = true;
-          
+
           products.push(product);
         } else {
           skippedRows++;
@@ -303,27 +310,27 @@ export default function AdminProducts() {
       setUploadProgress({ current: 3, total: 4 }); // Step 3: Validation complete
 
       const response = await productsAPI.bulkUpload(products);
-      
+
       setUploadProgress({ current: 4, total: 4 }); // Step 4: Upload complete
-      
+
       let message = `Successfully processed ${products.length} products`;
       if (response.data?.created) message += ` (${response.data.created} created`;
       if (response.data?.updated) message += `, ${response.data.updated} updated)`;
       else if (response.data?.created) message += ')';
-      
+
       if (skippedRows > 0) {
         message += ` • ${skippedRows} rows skipped due to missing required fields`;
       }
-      
+
       if (response.data?.errors && response.data.errors.length > 0) {
         message += ` • ${response.data.errors.length} errors occurred`;
         console.warn('Bulk upload errors:', response.data.errors);
       }
-      
+
       toast.success(message);
       setShowBulkDialog(false);
       fetchData();
-      
+
       // Reset file input
       event.target.value = '';
     } catch (error) {
@@ -366,16 +373,16 @@ export default function AdminProducts() {
                 <div className="text-sm text-slate-400">
                   Upload multiple products at once using a CSV file. Follow these steps:
                 </div>
-                
+
                 <div className="space-y-4">
                   <div className="flex items-start gap-3 p-3 bg-slate-700/30 rounded-lg">
                     <div className="w-6 h-6 rounded-full bg-primary text-white text-xs flex items-center justify-center font-bold">1</div>
                     <div>
                       <p className="font-medium text-sm">Download Template</p>
                       <p className="text-xs text-slate-400">Get the CSV template with sample data and correct format</p>
-                      <Button 
+                      <Button
                         onClick={downloadTemplate}
-                        variant="outline" 
+                        variant="outline"
                         size="sm"
                         className="mt-2"
                       >
@@ -409,7 +416,7 @@ export default function AdminProducts() {
                       </div>
                     </div>
                   </div>
-                  
+
                   {bulkUploading && (
                     <div className="space-y-3 p-4 bg-blue-900/20 border border-blue-800 rounded-lg">
                       <div className="flex items-center justify-center gap-2">
@@ -423,7 +430,7 @@ export default function AdminProducts() {
                       </div>
                       {uploadProgress.total > 0 && (
                         <div className="w-full bg-slate-700 rounded-full h-2">
-                          <div 
+                          <div
                             className="bg-blue-500 h-2 rounded-full transition-all duration-300"
                             style={{ width: `${(uploadProgress.current / uploadProgress.total) * 100}%` }}
                           ></div>
@@ -455,7 +462,7 @@ export default function AdminProducts() {
               </div>
             </DialogContent>
           </Dialog>
-          
+
           <Dialog open={showDialog} onOpenChange={(open) => { setShowDialog(open); if (!open) resetForm(); }}>
             <DialogTrigger asChild>
               <Button className="btn-admin bg-primary hover:bg-primary/90" data-testid="add-product-btn">
@@ -463,196 +470,196 @@ export default function AdminProducts() {
                 Add Product
               </Button>
             </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto scrollbar-invisible bg-slate-800 border-slate-700">
-            <DialogHeader>
-              <DialogTitle>{editingProduct ? 'Edit Product' : 'Add New Product'}</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Product Name *</Label>
-                  <Input
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Enter product name"
-                    className="input-admin"
-                    required
-                    data-testid="product-name-input"
-                  />
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto scrollbar-invisible bg-slate-800 border-slate-700">
+              <DialogHeader>
+                <DialogTitle>{editingProduct ? 'Edit Product' : 'Add New Product'}</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Product Name *</Label>
+                    <Input
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      placeholder="Enter product name"
+                      className="input-admin"
+                      required
+                      data-testid="product-name-input"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>SKU *</Label>
+                    <Input
+                      value={formData.sku}
+                      onChange={(e) => setFormData({ ...formData, sku: e.target.value.toUpperCase() })}
+                      placeholder="e.g., PRD001"
+                      className="input-admin"
+                      required
+                      disabled={!!editingProduct}
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>SKU *</Label>
-                  <Input
-                    value={formData.sku}
-                    onChange={(e) => setFormData({ ...formData, sku: e.target.value.toUpperCase() })}
-                    placeholder="e.g., PRD001"
-                    className="input-admin"
-                    required
-                    disabled={!!editingProduct}
-                  />
-                </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label>Description</Label>
-                <Textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Product description"
-                  className="input-admin min-h-[80px]"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Category *</Label>
-                  <Select
-                    value={formData.category_id}
-                    onValueChange={(value) => setFormData({ ...formData, category_id: value })}
-                  >
-                    <SelectTrigger className="input-admin">
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>GST Rate (%)</Label>
-                  <Select
-                    value={formData.gst_rate}
-                    onValueChange={(value) => setFormData({ ...formData, gst_rate: value })}
-                  >
-                    <SelectTrigger className="input-admin">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="0">0%</SelectItem>
-                      <SelectItem value="5">5%</SelectItem>
-                      <SelectItem value="12">12%</SelectItem>
-                      <SelectItem value="18">18%</SelectItem>
-                      <SelectItem value="28">28%</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>MRP (₹) *</Label>
-                  <Input
-                    type="number"
-                    value={formData.mrp}
-                    onChange={(e) => setFormData({ ...formData, mrp: e.target.value })}
-                    placeholder="0"
-                    className="input-admin"
-                    required
+                  <Label>Description</Label>
+                  <Textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="Product description"
+                    className="input-admin min-h-[80px]"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Selling Price (₹) *</Label>
-                  <Input
-                    type="number"
-                    value={formData.selling_price}
-                    onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
-                    placeholder="0"
-                    className="input-admin"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Cost Price (₹) *</Label>
-                  <Input
-                    type="number"
-                    value={formData.cost_price}
-                    onChange={(e) => setFormData({ ...formData, cost_price: e.target.value })}
-                    placeholder="0"
-                    className="input-admin"
-                    required
-                  />
-                </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Category *</Label>
+                    <Select
+                      value={formData.category_id}
+                      onValueChange={(value) => setFormData({ ...formData, category_id: value })}
+                    >
+                      <SelectTrigger className="input-admin">
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>GST Rate (%)</Label>
+                    <Select
+                      value={formData.gst_rate}
+                      onValueChange={(value) => setFormData({ ...formData, gst_rate: value })}
+                    >
+                      <SelectTrigger className="input-admin">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="0">0%</SelectItem>
+                        <SelectItem value="5">5%</SelectItem>
+                        <SelectItem value="12">12%</SelectItem>
+                        <SelectItem value="18">18%</SelectItem>
+                        <SelectItem value="28">28%</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label>MRP (₹) *</Label>
+                    <Input
+                      type="number"
+                      value={formData.mrp}
+                      onChange={(e) => setFormData({ ...formData, mrp: e.target.value })}
+                      placeholder="0"
+                      className="input-admin"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Selling Price (₹) *</Label>
+                    <Input
+                      type="number"
+                      value={formData.selling_price}
+                      onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
+                      placeholder="0"
+                      className="input-admin"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Cost Price (₹) *</Label>
+                    <Input
+                      type="number"
+                      value={formData.cost_price}
+                      onChange={(e) => setFormData({ ...formData, cost_price: e.target.value })}
+                      placeholder="0"
+                      className="input-admin"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Wholesale Price (₹)</Label>
+                    <Input
+                      type="number"
+                      value={formData.wholesale_price}
+                      onChange={(e) => setFormData({ ...formData, wholesale_price: e.target.value })}
+                      placeholder="Optional"
+                      className="input-admin"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Min Qty for Wholesale</Label>
+                    <Input
+                      type="number"
+                      value={formData.wholesale_min_qty}
+                      onChange={(e) => setFormData({ ...formData, wholesale_min_qty: e.target.value })}
+                      placeholder="10"
+                      className="input-admin"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Stock Quantity</Label>
+                    <Input
+                      type="number"
+                      value={formData.stock_qty}
+                      onChange={(e) => setFormData({ ...formData, stock_qty: e.target.value })}
+                      placeholder="0"
+                      className="input-admin"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Low Stock Threshold</Label>
+                    <Input
+                      type="number"
+                      value={formData.low_stock_threshold}
+                      onChange={(e) => setFormData({ ...formData, low_stock_threshold: e.target.value })}
+                      placeholder="10"
+                      className="input-admin"
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <Label>Wholesale Price (₹)</Label>
-                  <Input
-                    type="number"
-                    value={formData.wholesale_price}
-                    onChange={(e) => setFormData({ ...formData, wholesale_price: e.target.value })}
-                    placeholder="Optional"
-                    className="input-admin"
+                  <Label>Product Images</Label>
+                  <MultipleImageUpload
+                    value={formData.images}
+                    onChange={(images) => setFormData({ ...formData, images })}
+                    folder="products"
+                    maxFiles={5}
+                    label=""
+                    description="Upload product images (max 5 images, 5MB each)"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Min Qty for Wholesale</Label>
-                  <Input
-                    type="number"
-                    value={formData.wholesale_min_qty}
-                    onChange={(e) => setFormData({ ...formData, wholesale_min_qty: e.target.value })}
-                    placeholder="10"
-                    className="input-admin"
+
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={formData.is_active}
+                    onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
                   />
+                  <Label>Active</Label>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Stock Quantity</Label>
-                  <Input
-                    type="number"
-                    value={formData.stock_qty}
-                    onChange={(e) => setFormData({ ...formData, stock_qty: e.target.value })}
-                    placeholder="0"
-                    className="input-admin"
-                  />
+                <div className="flex justify-end gap-3 pt-4">
+                  <Button type="button" variant="ghost" onClick={() => setShowDialog(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" className="bg-primary hover:bg-primary/90" data-testid="save-product-btn">
+                    {editingProduct ? 'Update Product' : 'Create Product'}
+                  </Button>
                 </div>
-                <div className="space-y-2">
-                  <Label>Low Stock Threshold</Label>
-                  <Input
-                    type="number"
-                    value={formData.low_stock_threshold}
-                    onChange={(e) => setFormData({ ...formData, low_stock_threshold: e.target.value })}
-                    placeholder="10"
-                    className="input-admin"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Product Images</Label>
-                <MultipleImageUpload
-                  value={formData.images}
-                  onChange={(images) => setFormData({ ...formData, images })}
-                  folder="products"
-                  maxFiles={5}
-                  label=""
-                  description="Upload product images (max 5 images, 5MB each)"
-                />
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Switch
-                  checked={formData.is_active}
-                  onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
-                />
-                <Label>Active</Label>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4">
-                <Button type="button" variant="ghost" onClick={() => setShowDialog(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" className="bg-primary hover:bg-primary/90" data-testid="save-product-btn">
-                  {editingProduct ? 'Update Product' : 'Create Product'}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -668,7 +675,7 @@ export default function AdminProducts() {
             data-testid="product-search"
           />
         </div>
-        
+
         <Dialog>
           <DialogTrigger asChild>
             <Button variant="outline" size="sm" className="text-xs">

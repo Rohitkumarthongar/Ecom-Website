@@ -12,13 +12,15 @@ import { bannersAPI } from '../../lib/api';
 import { getImageUrl } from '../../lib/utils';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Image as ImageIcon, Eye } from 'lucide-react';
+import { usePopup } from '../../contexts/PopupContext';
 
 export default function AdminBanners() {
   const [banners, setBanners] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
   const [editingBanner, setEditingBanner] = useState(null);
-  
+  const { showPopup } = usePopup();
+
   const [formData, setFormData] = useState({
     title: '',
     image_url: '',
@@ -80,14 +82,20 @@ export default function AdminBanners() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Delete this banner?')) return;
-    try {
-      await bannersAPI.delete(id);
-      toast.success('Banner deleted');
-      fetchBanners();
-    } catch (error) {
-      toast.error('Failed to delete banner');
-    }
+    showPopup({
+      title: "Delete Banner",
+      message: "Are you sure you want to delete this banner?",
+      type: "error",
+      onConfirm: async () => {
+        try {
+          await bannersAPI.delete(id);
+          toast.success('Banner deleted');
+          fetchBanners();
+        } catch (error) {
+          toast.error('Failed to delete banner');
+        }
+      }
+    });
   };
 
   const handleToggle = async (banner) => {

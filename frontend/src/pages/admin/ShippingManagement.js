@@ -10,11 +10,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/ta
 import { Textarea } from '../../components/ui/textarea';
 import { ordersAPI, courierAPI } from '../../lib/api';
 import { toast } from 'sonner';
-import { 
-  Truck, Package, Search, MapPin, FileText, Printer, 
+import {
+  Truck, Package, Search, MapPin, FileText, Printer,
   RotateCcw, Ban, Eye, Clock, CheckCircle, AlertCircle,
   Download, RefreshCw, Phone, User, MapPinIcon
 } from 'lucide-react';
+import { usePopup } from '../../contexts/PopupContext';
 
 export default function ShippingManagement() {
   const [orders, setOrders] = useState([]);
@@ -28,6 +29,7 @@ export default function ShippingManagement() {
   const [pincodeCheck, setPincodeCheck] = useState({ pincode: '', result: null });
   const [returnData, setReturnData] = useState({ reason: '', quantity: 1, weight: '500' });
   const [activeTab, setActiveTab] = useState('all');
+  const { showPopup } = usePopup();
 
   useEffect(() => {
     fetchOrders();
@@ -36,13 +38,13 @@ export default function ShippingManagement() {
   const fetchOrders = async () => {
     try {
       const response = await ordersAPI.getAll({ limit: 100 });
-      
+
       // The axios response has the data in response.data
       // The backend returns { orders: [...], total: ..., page: ..., limit: ... }
       const ordersData = response.data?.orders || [];
-      
+
       setOrders(ordersData);
-      
+
       // If no orders found, show a message
       if (ordersData.length === 0) {
         toast.info('No orders found. Create some orders to test shipping functionality.');
@@ -108,15 +110,20 @@ export default function ShippingManagement() {
   };
 
   const handleCancelShipment = async (orderId) => {
-    if (!window.confirm('Are you sure you want to cancel this shipment?')) return;
-    
-    try {
-      await courierAPI.cancelShipment(orderId);
-      toast.success('Shipment cancelled successfully');
-      fetchOrders();
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Failed to cancel shipment');
-    }
+    showPopup({
+      title: "Cancel Shipment",
+      message: "Are you sure you want to cancel this shipment?",
+      type: "warning",
+      onConfirm: async () => {
+        try {
+          await courierAPI.cancelShipment(orderId);
+          toast.success('Shipment cancelled successfully');
+          fetchOrders();
+        } catch (error) {
+          toast.error(error.response?.data?.detail || 'Failed to cancel shipment');
+        }
+      }
+    });
   };
 
   const handleCreateReturn = async () => {
@@ -136,7 +143,7 @@ export default function ShippingManagement() {
       toast.error('Please enter a valid 6-digit pincode');
       return;
     }
-    
+
     try {
       const result = await courierAPI.checkPincode(pincodeCheck.pincode);
       setPincodeCheck({ ...pincodeCheck, result: result.data });
@@ -150,7 +157,7 @@ export default function ShippingManagement() {
     try {
       const today = new Date().toISOString().split('T')[0];
       const result = await courierAPI.getPicklist(today);
-      
+
       // Convert to CSV and download
       const csvContent = [
         ['Order Number', 'Customer', 'Product', 'SKU', 'Quantity', 'AWB', 'Payment Method'].join(','),
@@ -164,7 +171,7 @@ export default function ShippingManagement() {
           item.payment_method
         ].join(','))
       ].join('\n');
-      
+
       const blob = new Blob([csvContent], { type: 'text/csv' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -172,7 +179,7 @@ export default function ShippingManagement() {
       a.download = `picklist-${today}.csv`;
       a.click();
       window.URL.revokeObjectURL(url);
-      
+
       toast.success('Picklist downloaded successfully');
     } catch (error) {
       toast.error('Failed to download picklist');
@@ -269,7 +276,7 @@ export default function ShippingManagement() {
               </div>
             </DialogContent>
           </Dialog>
-          
+
           <Button onClick={handleDownloadPicklist} variant="outline">
             <Download className="w-4 h-4 mr-2" />
             Download Picklist
@@ -370,7 +377,7 @@ export default function ShippingManagement() {
                                 Ship
                               </Button>
                             )}
-                            
+
                             {order.tracking_number && (
                               <>
                                 <Button
@@ -389,7 +396,7 @@ export default function ShippingManagement() {
                                 </Button>
                               </>
                             )}
-                            
+
                             {order.status === 'shipped' && (
                               <Button
                                 size="sm"
@@ -400,7 +407,7 @@ export default function ShippingManagement() {
                                 <Ban className="w-4 h-4" />
                               </Button>
                             )}
-                            
+
                             {['delivered', 'shipped'].includes(order.status) && (
                               <Button
                                 size="sm"
@@ -454,7 +461,7 @@ export default function ShippingManagement() {
                   <p>{trackingData.expected_delivery || 'N/A'}</p>
                 </div>
               </div>
-              
+
               {trackingData.tracking_history && trackingData.tracking_history.length > 0 && (
                 <div>
                   <Label className="text-slate-400 mb-2 block">Tracking History</Label>

@@ -12,13 +12,15 @@ import { Textarea } from '../../components/ui/textarea';
 import { offersAPI } from '../../lib/api';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Percent } from 'lucide-react';
+import { usePopup } from '../../contexts/PopupContext';
 
 export default function AdminOffers() {
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
   const [editingOffer, setEditingOffer] = useState(null);
-  
+  const { showPopup } = usePopup();
+
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -100,14 +102,20 @@ export default function AdminOffers() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Delete this offer?')) return;
-    try {
-      await offersAPI.delete(id);
-      toast.success('Offer deleted');
-      fetchOffers();
-    } catch (error) {
-      toast.error('Failed to delete offer');
-    }
+    showPopup({
+      title: "Delete Offer",
+      message: "Are you sure you want to delete this offer?",
+      type: "error",
+      onConfirm: async () => {
+        try {
+          await offersAPI.delete(id);
+          toast.success('Offer deleted');
+          fetchOffers();
+        } catch (error) {
+          toast.error('Failed to delete offer');
+        }
+      }
+    });
   };
 
   return (

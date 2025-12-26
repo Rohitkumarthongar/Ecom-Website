@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Connection Test</title>
+</head>
+<body>
+    <h1>API Connection Test</h1>
+    <div id="results"></div>
+
+    <script>
+        async function testAPI() {
+            const results = document.getElementById('results');
+            const baseURL = 'http://localhost:8000/api';
+            
+            // Test banner endpoint
+            try {
+                const response = await fetch(`${baseURL}/banners`);
+                const data = await response.json();
+                results.innerHTML += `<p>✅ Banners: ${data.length} found</p>`;
+            } catch (error) {
+                results.innerHTML += `<p>❌ Banners: ${error.message}</p>`;
+            }
+            
+            // Test offers endpoint
+            try {
+                const response = await fetch(`${baseURL}/offers`);
+                const data = await response.json();
+                results.innerHTML += `<p>✅ Offers: ${data.length} found</p>`;
+            } catch (error) {
+                results.innerHTML += `<p>❌ Offers: ${error.message}</p>`;
+            }
+            
+            // Test upload endpoint (should fail with auth error)
+            try {
+                const response = await fetch(`${baseURL}/upload/image`, {
+                    method: 'POST'
+                });
+                results.innerHTML += `<p>✅ Upload endpoint: ${response.status} (${response.statusText})</p>`;
+            } catch (error) {
+                results.innerHTML += `<p>❌ Upload: ${error.message}</p>`;
+            }
+        }
+        
+        testAPI();
+    </script>
+</body>
+</html>

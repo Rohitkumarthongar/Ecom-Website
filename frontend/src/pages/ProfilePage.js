@@ -214,8 +214,10 @@ export default function ProfilePage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>GST Number (Optional)</Label>
+                  <Label htmlFor="gst_number">GST Number</Label>
                   <Input
+                  id="gst_number"
+                    required
                     value={sellerRequest.gst_number}
                     onChange={(e) => setSellerRequest({ ...sellerRequest, gst_number: e.target.value.toUpperCase() })}
                     placeholder="e.g., 29ABCDE1234F1Z5"

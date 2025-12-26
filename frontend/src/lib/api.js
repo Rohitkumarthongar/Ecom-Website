@@ -74,8 +74,16 @@ export const ordersAPI = {
   getOne: (id) => api.get(`/orders/${id}`),
   getAll: (params) => api.get('/admin/orders', { params }),
   updateStatus: (id, data) => api.put(`/admin/orders/${id}/status`, data),
-  getInvoice: (id) => api.get(`/admin/orders/${id}/invoice`),
-  getLabel: (id) => api.get(`/admin/orders/${id}/label`),
+  getInvoice: (id) => api.get(`/admin/orders/${id}/invoice`, { responseType: 'blob' }),
+  getShippingLabel: (id) => api.get(`/admin/orders/${id}/shipping-label`, { responseType: 'blob' }),
+  getLabel: (id) => api.get(`/courier/label/${id}`, { responseType: 'blob' }),
+  // Cancellation endpoints
+  checkCancellationEligibility: (id) => api.get(`/orders/${id}/can-cancel`),
+  cancelOrder: (id, data) => api.post(`/orders/${id}/cancel`, data),
+  // Return endpoints
+  checkReturnEligibility: (id) => api.get(`/orders/${id}/can-return`),
+  createReturn: (id, data) => api.post(`/orders/${id}/return`, data),
+  getOrderReturns: (id) => api.get(`/orders/${id}/returns`),
 };
 
 // POS API
@@ -88,7 +96,13 @@ export const posAPI = {
 export const returnsAPI = {
   create: (data) => api.post('/returns', data),
   getAll: (params) => api.get('/admin/returns', { params }),
+  getUserReturns: () => api.get('/returns'),
   update: (id, data) => api.put(`/admin/returns/${id}`, data),
+  getById: (id) => api.get(`/returns/${id}`),
+  uploadEvidence: (id, formData) => api.post(`/returns/${id}/evidence`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  trackReturn: (id) => api.get(`/returns/${id}/tracking`),
 };
 
 // Banners API
@@ -136,6 +150,7 @@ export const settingsAPI = {
 export const reportsAPI = {
   getSales: (params) => api.get('/admin/reports/sales', { params }),
   getInventory: () => api.get('/admin/reports/inventory'),
+  getInventoryStatus: () => api.get('/admin/reports/inventory-status'),
   getProfitLoss: (params) => api.get('/admin/reports/profit-loss', { params }),
 };
 
@@ -163,6 +178,8 @@ export const dashboardAPI = {
 // Pages API
 export const pagesAPI = {
   getPrivacyPolicy: () => api.get('/pages/privacy-policy'),
+  getTerms: () => api.get('/pages/terms'),
+  getReturnPolicy: () => api.get('/pages/return-policy'),
   getContact: () => api.get('/pages/contact'),
   submitContact: (data) => api.post('/contact', data),
   updatePage: (slug, data) => api.put(`/admin/pages/${slug}`, data),
@@ -205,7 +222,12 @@ export const printAPI = {
 
 // Payment QR API
 export const paymentAPI = {
-  getQR: (amount) => api.get('/payment/qr', { params: { amount } }),
+  getQR: (amount, customerName = 'Customer', orderNumber = '') => 
+    api.post('/generate-qr', { 
+      amount, 
+      customer_name: customerName, 
+      order_number: orderNumber 
+    }),
 };
 
 // Product Lookup API

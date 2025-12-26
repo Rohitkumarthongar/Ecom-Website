@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { Button } from '../components/ui/button';
 import { ScrollArea } from '../components/ui/scroll-area';
+import NotificationDropdown from '../components/NotificationDropdown';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,6 +34,7 @@ const menuItems = [
   { icon: Settings, label: 'Couriers', path: '/admin/couriers' },
   { icon: CreditCard, label: 'Payment Gateways', path: '/admin/payments' },
   { icon: BarChart3, label: 'Reports', path: '/admin/reports' },
+  { icon: Warehouse, label: 'Inventory Status', path: '/admin/inventory-status' },
   { icon: FileText, label: 'Pages', path: '/admin/pages' },
   { icon: Users, label: 'Team', path: '/admin/team' },
   { icon: Settings, label: 'Settings', path: '/admin/settings' },
@@ -109,24 +111,35 @@ export default function AdminLayout({ children }) {
             </div>
             <span className="font-bold">Admin</span>
           </Link>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Users className="w-5 h-5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => navigate('/')}>
-                <Store className="w-4 h-4 mr-2" />
-                View Store
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={logout} className="text-red-400">
-                <LogOut className="w-4 h-4 mr-2" />
-                Logout
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleTheme}
+              title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            >
+              {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </Button>
+            <NotificationDropdown />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Users className="w-5 h-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => navigate('/')}>
+                  <Store className="w-4 h-4 mr-2" />
+                  View Store
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={logout} className="text-red-400">
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Logout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </header>
 

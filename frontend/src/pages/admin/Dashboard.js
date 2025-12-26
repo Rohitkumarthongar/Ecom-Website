@@ -9,11 +9,13 @@ import {
   RefreshCcw, IndianRupee, ArrowUpRight, ArrowDownRight, Eye
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { usePopup } from '../../contexts/PopupContext';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { showPopup } = usePopup();
 
   useEffect(() => {
     fetchDashboard();
@@ -41,19 +43,22 @@ export default function AdminDashboard() {
   };
 
   const handleClearData = async () => {
-    if (!window.confirm("Are you sure you want to clear ALL data? This will delete orders, products, customers, and more. This action cannot be undone.")) {
-      return;
-    }
-
-    try {
-      setLoading(true);
-      await dashboardAPI.clearData();
-      toast.success('All data cleared successfully');
-      fetchDashboard();
-    } catch (error) {
-      toast.error('Failed to clear data');
-      setLoading(false);
-    }
+    showPopup({
+      title: "Clear All Data",
+      message: "Are you sure you want to clear ALL data? This will delete orders, products, customers, and more. This action cannot be undone.",
+      type: "destructive",
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          await dashboardAPI.clearData();
+          toast.success('All data cleared successfully');
+          fetchDashboard();
+        } catch (error) {
+          toast.error('Failed to clear data');
+          setLoading(false);
+        }
+      }
+    });
   };
 
   const statCards = [
@@ -158,7 +163,7 @@ export default function AdminDashboard() {
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map((stat, index) => (
-          <Card key={index} className="card-stat">
+          <Card key={index} className="bg-slate-800 border-slate-700">
             <div className="flex items-start justify-between">
               <div className={`p-2 rounded-lg bg-slate-700/50`}>
                 <stat.icon className={`w-5 h-5 ${stat.color}`} />

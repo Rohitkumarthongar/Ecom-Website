@@ -70,43 +70,71 @@ export default function AdminOrders() {
   const handlePrintInvoice = async (orderId) => {
     try {
       const response = await ordersAPI.getInvoice(orderId);
+      
+      // Create blob from response data
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      
       // Open in new window for printing
-      const printWindow = window.open('', '_blank');
-      printWindow.document.write(`
-        <html>
-          <head><title>Invoice ${response.data.invoice_number}</title></head>
-          <body>
-            <pre>${JSON.stringify(response.data, null, 2)}</pre>
-            <script>window.print();</script>
-          </body>
-        </html>
-      `);
+      const printWindow = window.open(url, '_blank');
+      if (printWindow) {
+        printWindow.onload = () => {
+          printWindow.print();
+        };
+      } else {
+        // Fallback: download the file
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `Invoice_${orderId}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+      
+      // Clean up
+      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
     } catch (error) {
+      console.error('Invoice error:', error);
       toast.error('Failed to generate invoice');
     }
   };
 
   const handlePrintLabel = async (orderId) => {
     try {
-      const response = await ordersAPI.getLabel(orderId);
-      const printWindow = window.open('', '_blank');
-      printWindow.document.write(`
-        <html>
-          <head><title>Shipping Label</title></head>
-          <body>
-            <pre>${JSON.stringify(response.data, null, 2)}</pre>
-            <script>window.print();</script>
-          </body>
-        </html>
-      `);
+      const response = await ordersAPI.getShippingLabel(orderId);
+      
+      // Create blob from response data
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      
+      // Open in new window for printing
+      const printWindow = window.open(url, '_blank');
+      if (printWindow) {
+        printWindow.onload = () => {
+          printWindow.print();
+        };
+      } else {
+        // Fallback: download the file
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `ShippingLabel_${orderId}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+      
+      // Clean up
+      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
     } catch (error) {
-      toast.error('Failed to generate label');
+      console.error('Shipping label error:', error);
+      toast.error('Failed to generate shipping label');
     }
   };
 
   const filteredOrders = orders.filter(o =>
     o.order_number.toLowerCase().includes(search.toLowerCase()) ||
-    o.customer_phone?.includes(search)
+    o.customer_phone?.includes(search) ||
+    o.customer_name?.toLowerCase().includes(search.toLowerCase())
   );
 
   const getStatusBadgeClass = (status) => {
@@ -143,7 +171,7 @@ export default function AdminOrders() {
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input
-            placeholder="Search by order # or phone..."
+            placeholder="Search by order #, phone, or customer name..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-10 input-admin"
@@ -186,7 +214,7 @@ export default function AdminOrders() {
                     <TableCell className="text-slate-400">
                       {new Date(order.created_at).toLocaleDateString('en-IN')}
                     </TableCell>
-                    <TableCell>{order.customer_phone || '-'}</TableCell>
+                    <TableCell>{order.customer_name || order.customer_phone || '-'}</TableCell>
                     <TableCell>{order.items.length} items</TableCell>
                     <TableCell className="font-semibold">₹{order.grand_total.toLocaleString()}</TableCell>
                     <TableCell>

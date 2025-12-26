@@ -1,7 +1,9 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart } from '../contexts/CartContext';
+import { useWishlist } from '../contexts/WishlistContext';
 import { useTheme } from '../contexts/ThemeContext';
+import NotificationDropdown from '../components/NotificationDropdown';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import {
@@ -15,7 +17,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTr
 import { Badge } from '../components/ui/badge';
 import {
   Search, ShoppingCart, User, Menu, Heart, Package,
-  LogOut, Sun, Moon, ChevronRight, Minus, Plus, Trash2
+  LogOut, Sun, Moon, ChevronRight, Minus, Plus, Trash2, RefreshCw,
+  Facebook, Instagram, Twitter, Youtube, Phone
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import api from '../lib/api';
@@ -24,6 +27,7 @@ import { getImageUrl } from '../lib/utils';
 export const StoreHeader = () => {
   const { user, logout, isAdmin, isWholesale } = useAuth();
   const { items, getItemCount, getSubtotal, updateQuantity, removeItem } = useCart();
+  const { getWishlistCount } = useWishlist();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
@@ -38,6 +42,7 @@ export const StoreHeader = () => {
   const fetchSettings = async () => {
     try {
       const response = await api.get('/settings/public');
+      console.log('Public Settings Response:', response.data);
       setSettings(response.data);
       // Update page title and favicon
       if (response.data.business_name) {
@@ -112,59 +117,22 @@ export const StoreHeader = () => {
               {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
             </Button>
 
-            {/* User Menu */}
-            {user ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="gap-2" data-testid="user-menu-trigger">
-                    <User className="w-5 h-5" />
-                    <span className="hidden sm:inline">{user.name?.split(' ')[0]}</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <div className="px-2 py-1.5">
-                    <p className="font-semibold">{user.name}</p>
-                    <p className="text-sm text-muted-foreground">{user.phone}</p>
-                    {user.is_wholesale && (
-                      <Badge className="mt-1 bg-[#5b21b6]">Wholesale Account</Badge>
-                    )}
-                  </div>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate('/orders')} data-testid="my-orders-link">
-                    <Package className="w-4 h-4 mr-2" />
-                    My Orders
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate('/wishlist')}>
-                    <Heart className="w-4 h-4 mr-2" />
-                    Wishlist
-                  </DropdownMenuItem>
-                  {isAdmin && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => navigate('/admin')} data-testid="admin-dashboard-link">
-                        Admin Dashboard
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={logout} className="text-destructive" data-testid="logout-btn">
-                    <LogOut className="w-4 h-4 mr-2" />
-                    Logout
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <Button
-                onClick={() => navigate('/login')}
-                className="btn-primary text-sm py-2 px-4"
-                data-testid="login-btn"
-              >
-                Login
+            {/* Wishlist */}
+            <Link to="/wishlist" className="relative">
+              <Button variant="ghost" size="icon" className="relative">
+                <Heart className="w-5 h-5" />
+                {getWishlistCount() > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center font-bold">
+                    {getWishlistCount()}
+                  </span>
+                )}
               </Button>
-            )}
+            </Link>
+
+            {/* Notifications */}
+            {user && <NotificationDropdown />}
 
             {/* Cart */}
-
             <Sheet open={cartOpen} onOpenChange={setCartOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" className="relative" data-testid="cart-trigger">
@@ -271,6 +239,65 @@ export const StoreHeader = () => {
               </SheetContent>
             </Sheet>
 
+            {/* User Menu - Moved to End */}
+            {user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="gap-2" data-testid="user-menu-trigger">
+                    <User className="w-5 h-5" />
+                    <span className="hidden sm:inline">{user.name?.split(' ')[0]}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <div className="px-2 py-1.5">
+                    <p className="font-semibold">{user.name}</p>
+                    <p className="text-sm text-muted-foreground">{user.phone}</p>
+                    {user.is_wholesale && (
+                      <Badge className="mt-1 bg-[#5b21b6]">Wholesale Account</Badge>
+                    )}
+                  </div>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate('/profile')}>
+                    <User className="w-4 h-4 mr-2" />
+                    Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/orders')} data-testid="my-orders-link">
+                    <Package className="w-4 h-4 mr-2" />
+                    My Orders
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/returns')}>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Returns
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/wishlist')}>
+                    <Heart className="w-4 h-4 mr-2" />
+                    Wishlist
+                  </DropdownMenuItem>
+                  {isAdmin && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => navigate('/admin')} data-testid="admin-dashboard-link">
+                        Admin Dashboard
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={logout} className="text-destructive" data-testid="logout-btn">
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Button
+                onClick={() => navigate('/login')}
+                className="btn-primary text-sm py-2 px-4"
+                data-testid="login-btn"
+              >
+                Login
+              </Button>
+            )}
+
             {/* Mobile Menu */}
             <Button
               variant="ghost"
@@ -336,7 +363,7 @@ export const StoreFooter = () => {
           <div>
             <div className="flex items-center gap-2 mb-4">
               {settings?.logo_url ? (
-                <img src={getImageUrl(settings.logo_url)} alt="Logo" className="w-10 h-10 rounded-xl object-cover" />
+                <img src={getImageUrl(settings.logo_url)} alt="Logo" className="h-10 w-auto object-contain" />
               ) : (
                 <div className="w-10 h-10 rounded-xl gradient-hero flex items-center justify-center">
                   <span className="text-white font-extrabold text-xl">{settings?.business_name?.[0] || 'B'}</span>
@@ -347,6 +374,28 @@ export const StoreFooter = () => {
             <p className="text-slate-400 text-sm">
               India's favorite online marketplace for fashion, electronics, and more.
             </p>
+            <div className="flex gap-4 mt-6">
+              {settings?.facebook_url && (
+                <a href={settings.facebook_url} target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-blue-500 transition-colors">
+                  <Facebook className="w-5 h-5" />
+                </a>
+              )}
+              {settings?.instagram_url && (
+                <a href={settings.instagram_url} target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-pink-500 transition-colors">
+                  <Instagram className="w-5 h-5" />
+                </a>
+              )}
+              {settings?.twitter_url && (
+                <a href={settings.twitter_url} target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-sky-400 transition-colors">
+                  <Twitter className="w-5 h-5" />
+                </a>
+              )}
+              {settings?.youtube_url && (
+                <a href={settings.youtube_url} target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-red-500 transition-colors">
+                  <Youtube className="w-5 h-5" />
+                </a>
+              )}
+            </div>
           </div>
 
           <div>
@@ -361,7 +410,7 @@ export const StoreFooter = () => {
           <div>
             <h4 className="font-bold mb-4">Customer Service</h4>
             <ul className="space-y-2 text-sm text-slate-400">
-              <li><Link to="/returns" className="hover:text-white transition-colors">Returns</Link></li>
+              <li><Link to="/return-policy" className="hover:text-white transition-colors">Returns & Refunds</Link></li>
               <li><Link to="/shipping" className="hover:text-white transition-colors">Shipping Info</Link></li>
               <li><Link to="/faq" className="hover:text-white transition-colors">FAQs</Link></li>
             </ul>
@@ -371,6 +420,7 @@ export const StoreFooter = () => {
             <h4 className="font-bold mb-4">Legal</h4>
             <ul className="space-y-2 text-sm text-slate-400">
               <li><Link to="/privacy-policy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
+              <li><Link to="/return-policy" className="hover:text-white transition-colors">Return Policy</Link></li>
               <li><Link to="/terms" className="hover:text-white transition-colors">Terms of Service</Link></li>
             </ul>
           </div>

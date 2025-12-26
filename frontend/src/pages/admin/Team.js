@@ -20,6 +20,7 @@ import {
     SelectValue,
 } from '../../components/ui/select';
 import { UserPlus, Edit, Trash2, Shield, Users, Store } from 'lucide-react';
+import { usePopup } from '../../contexts/PopupContext';
 
 export default function AdminTeam() {
     const [users, setUsers] = useState([]);
@@ -28,6 +29,7 @@ export default function AdminTeam() {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [selectedUser, setSelectedUser] = useState(null);
+    const { showPopup } = usePopup();
 
     // Create form state
     const [newUser, setNewUser] = useState({
@@ -76,17 +78,20 @@ export default function AdminTeam() {
     };
 
     const handleRemoveAdmin = async (userId) => {
-        if (!window.confirm('Are you sure you want to remove admin access from this user?')) {
-            return;
-        }
-
-        try {
-            await api.delete(`/admin/team/${userId}`);
-            toast.success('Admin access removed');
-            fetchUsers();
-        } catch (error) {
-            toast.error(error.response?.data?.detail || 'Failed to remove admin access');
-        }
+        showPopup({
+            title: "Remove Admin Access",
+            message: "Are you sure you want to remove admin access from this user?",
+            type: "warning",
+            onConfirm: async () => {
+                try {
+                    await api.delete(`/admin/team/${userId}`);
+                    toast.success('Admin access removed');
+                    fetchUsers();
+                } catch (error) {
+                    toast.error(error.response?.data?.detail || 'Failed to remove admin access');
+                }
+            }
+        });
     };
 
     const getRoleBadge = (role, isWholesale) => {

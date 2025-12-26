@@ -12,6 +12,7 @@ import { Save, FileText } from 'lucide-react';
 export default function AdminPages() {
   const [privacyPolicy, setPrivacyPolicy] = useState({ title: 'Privacy Policy', content: '' });
   const [terms, setTerms] = useState({ title: 'Terms of Service', content: '' });
+  const [returnPolicy, setReturnPolicy] = useState({ title: 'Return Policy', content: '' });
   const [contact, setContact] = useState({ title: 'Contact Us', content: '' });
   const [saving, setSaving] = useState(false);
 
@@ -23,6 +24,15 @@ export default function AdminPages() {
     try {
       const privacyRes = await pagesAPI.getPrivacyPolicy();
       if (privacyRes.data) setPrivacyPolicy(privacyRes.data);
+
+      const termsRes = await pagesAPI.getTerms();
+      if (termsRes.data) setTerms(termsRes.data);
+
+      const returnsRes = await pagesAPI.getReturnPolicy();
+      if (returnsRes.data) setReturnPolicy(returnsRes.data);
+
+      const contactRes = await pagesAPI.getContact();
+      if (contactRes.data) setContact(contactRes.data);
     } catch (error) {
       console.log('Using default pages');
     }
@@ -52,6 +62,7 @@ export default function AdminPages() {
           <TabsTrigger value="privacy">Privacy Policy</TabsTrigger>
           <TabsTrigger value="terms">Terms of Service</TabsTrigger>
           <TabsTrigger value="contact">Contact Us</TabsTrigger>
+          <TabsTrigger value="returns">Return Policy</TabsTrigger>
         </TabsList>
 
         <TabsContent value="privacy">
@@ -80,8 +91,8 @@ export default function AdminPages() {
                   placeholder="Enter your privacy policy content here..."
                 />
               </div>
-              <Button 
-                onClick={() => handleSave('privacy-policy', privacyPolicy)} 
+              <Button
+                onClick={() => handleSave('privacy-policy', privacyPolicy)}
                 disabled={saving}
                 className="bg-primary hover:bg-primary/90"
               >
@@ -118,8 +129,8 @@ export default function AdminPages() {
                   placeholder="Enter your terms of service content here..."
                 />
               </div>
-              <Button 
-                onClick={() => handleSave('terms', terms)} 
+              <Button
+                onClick={() => handleSave('terms', terms)}
                 disabled={saving}
                 className="bg-primary hover:bg-primary/90"
               >
@@ -151,8 +162,46 @@ export default function AdminPages() {
               <p className="text-sm text-slate-400">
                 Note: Contact details (phone, email, address) are pulled from Settings.
               </p>
-              <Button 
-                onClick={() => handleSave('contact', contact)} 
+              <Button
+                onClick={() => handleSave('contact', contact)}
+                disabled={saving}
+                className="bg-primary hover:bg-primary/90"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                {saving ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="returns">
+          <Card className="bg-slate-800 border-slate-700">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                Return Policy
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Title</Label>
+                <Input
+                  value={returnPolicy.title}
+                  onChange={(e) => setReturnPolicy({ ...returnPolicy, title: e.target.value })}
+                  className="input-admin"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Content (Markdown supported)</Label>
+                <Textarea
+                  value={returnPolicy.content}
+                  onChange={(e) => setReturnPolicy({ ...returnPolicy, content: e.target.value })}
+                  className="input-admin min-h-[400px] font-mono"
+                  placeholder="Enter your return policy content here..."
+                />
+              </div>
+              <Button
+                onClick={() => handleSave('return-policy', returnPolicy)}
                 disabled={saving}
                 className="bg-primary hover:bg-primary/90"
               >
