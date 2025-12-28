@@ -31,25 +31,25 @@ export default function InventoryStatus() {
 
   const getStatusBadge = (status) => {
     const statusConfig = {
-      out_of_stock: { 
-        label: 'Out of Stock', 
+      out_of_stock: {
+        label: 'Out of Stock',
         className: 'bg-red-500/20 text-red-400',
-        icon: XCircle 
+        icon: XCircle
       },
-      low_stock: { 
-        label: 'Low Stock', 
+      low_stock: {
+        label: 'Low Stock',
         className: 'bg-yellow-500/20 text-yellow-400',
-        icon: AlertTriangle 
+        icon: AlertTriangle
       },
-      reserved_low: { 
-        label: 'Reserved Low', 
+      reserved_low: {
+        label: 'Reserved Low',
         className: 'bg-orange-500/20 text-orange-400',
-        icon: TrendingDown 
+        icon: TrendingDown
       },
-      in_stock: { 
-        label: 'In Stock', 
+      in_stock: {
+        label: 'In Stock',
         className: 'bg-green-500/20 text-green-400',
-        icon: CheckCircle 
+        icon: CheckCircle
       }
     };
 
@@ -65,13 +65,13 @@ export default function InventoryStatus() {
   };
 
   const filteredProducts = inventoryData?.products?.filter(product => {
-    const matchesSearch = 
+    const matchesSearch =
       product.product_name.toLowerCase().includes(search.toLowerCase()) ||
       product.sku.toLowerCase().includes(search.toLowerCase()) ||
       product.category_name.toLowerCase().includes(search.toLowerCase());
-    
+
     const matchesStatus = statusFilter === 'all' || product.stock_status === statusFilter;
-    
+
     return matchesSearch && matchesStatus;
   }) || [];
 
@@ -171,7 +171,7 @@ export default function InventoryStatus() {
             <TabsTrigger value="in_stock">In Stock</TabsTrigger>
           </TabsList>
         </Tabs>
-        
+
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input
@@ -192,7 +192,9 @@ export default function InventoryStatus() {
                 <TableHead className="text-slate-400">Product</TableHead>
                 <TableHead className="text-slate-400">SKU</TableHead>
                 <TableHead className="text-slate-400">Category</TableHead>
-                <TableHead className="text-slate-400 text-center">Total Stock</TableHead>
+                <TableHead className="text-slate-400 text-center">Original Stock</TableHead>
+                <TableHead className="text-slate-400 text-center">Sold Qty</TableHead>
+                <TableHead className="text-slate-400 text-center">Current Stock</TableHead>
                 <TableHead className="text-slate-400 text-center">Blocked</TableHead>
                 <TableHead className="text-slate-400 text-center">Available</TableHead>
                 <TableHead className="text-slate-400 text-center">Threshold</TableHead>
@@ -203,7 +205,7 @@ export default function InventoryStatus() {
             <TableBody>
               {filteredProducts.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8 text-slate-400">
+                  <TableCell colSpan={11} className="text-center py-8 text-slate-400">
                     <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
                     No products found
                   </TableCell>
@@ -219,6 +221,12 @@ export default function InventoryStatus() {
                     </TableCell>
                     <TableCell className="font-mono text-sm">{product.sku}</TableCell>
                     <TableCell className="text-slate-400">{product.category_name}</TableCell>
+                    <TableCell className="text-center font-semibold text-slate-300">{product.original_stock || 0}</TableCell>
+                    <TableCell className="text-center">
+                      <span className="text-blue-400 font-medium">
+                        {product.sold_qty || 0}
+                      </span>
+                    </TableCell>
                     <TableCell className="text-center font-semibold">{product.total_stock}</TableCell>
                     <TableCell className="text-center">
                       <span className={product.blocked_qty > 0 ? 'text-orange-400 font-medium' : 'text-slate-500'}>

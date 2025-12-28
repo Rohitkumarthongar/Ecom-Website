@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
+import { Tabs, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { dashboardAPI } from '../../lib/api';
@@ -15,6 +17,7 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [orderFilter, setOrderFilter] = useState('all');
   const { showPopup } = usePopup();
 
   useEffect(() => {
@@ -207,19 +210,36 @@ export default function AdminDashboard() {
         ))}
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-6">
+      <div className="grid lg:grid-cols-3 gap-6">
         {/* Recent Orders */}
         <Card className="bg-slate-800 border-slate-700">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Recent Orders</CardTitle>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/admin/orders')}>
-              View All
-            </Button>
+          <CardHeader>
+            <div className="flex items-center justify-between mb-3">
+              <CardTitle>Recent Orders</CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => navigate('/admin/orders')}>
+                View All
+              </Button>
+            </div>
+            <Tabs value={orderFilter} onValueChange={setOrderFilter} className="w-full">
+              <TabsList className="grid w-full grid-cols-3 bg-slate-700">
+                <TabsTrigger value="all">All</TabsTrigger>
+                <TabsTrigger value="online">Online</TabsTrigger>
+                <TabsTrigger value="offline">Offline</TabsTrigger>
+              </TabsList>
+            </Tabs>
           </CardHeader>
           <CardContent>
-            {stats?.recent_orders?.length > 0 ? (
+            {stats?.recent_orders?.filter(order => {
+              if (orderFilter === 'online') return !order.is_offline;
+              if (orderFilter === 'offline') return order.is_offline;
+              return true;
+            }).length > 0 ? (
               <div className="space-y-3">
-                {stats.recent_orders.map((order) => (
+                {stats.recent_orders.filter(order => {
+                  if (orderFilter === 'online') return !order.is_offline;
+                  if (orderFilter === 'offline') return order.is_offline;
+                  return true;
+                }).map((order) => (
                   <div
                     key={order.id}
                     className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors"
@@ -277,6 +297,44 @@ export default function AdminDashboard() {
               </div>
             ) : (
               <p className="text-center text-slate-400 py-8">No low stock items</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Offline Sales */}
+        <Card className="bg-slate-800 border-slate-700">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Offline Sales (POS)</CardTitle>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/admin/pos')}>
+              New Sale
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {stats?.recent_orders?.filter(order => order.is_offline).length > 0 ? (
+              <div className="space-y-3">
+                {stats.recent_orders.filter(order => order.is_offline).slice(0, 5).map((order) => (
+                  <div
+                    key={order.id}
+                    className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg cursor-pointer hover:bg-slate-700 transition-colors"
+                    onClick={() => navigate(`/admin/orders?id=${order.id}`)}
+                  >
+                    <div>
+                      <p className="font-medium">#{order.order_number}</p>
+                      <p className="text-sm text-slate-400">
+                        {new Date(order.created_at).toLocaleDateString('en-IN')}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold">₹{order.grand_total.toLocaleString()}</p>
+                      <Badge className="bg-violet-500/20 text-violet-400">
+                        POS
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-center text-slate-400 py-8">No offline sales</p>
             )}
           </CardContent>
         </Card>
