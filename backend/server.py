@@ -1717,6 +1717,100 @@ def get_inventory(low_stock_only: bool = False, admin: dict = Depends(admin_requ
         }
     }
 
+# ============ POS (Point of Sale) ============
+
+@api_router.post("/admin/pos/sale")
+def create_pos_sale(data: OrderCreate, admin: dict = Depends(admin_required), db: Session = Depends(get_db)):
+    """Create an offline POS sale"""
+    # Validate and fetch products
+    items_valid = []
+    subtotal = 0
+    
+    for item in data.items:
+        prod = db.query(models.Product).filter(models.Product.id == item.product_id).first()
+        if not prod:
+            raise HTTPException(status_code=400, detail=f"Product {item.product_id} not found")
+        if prod.stock_qty < item.quantity:
+            raise HTTPException(status_code=400, detail=f"Insufficient stock for {prod.name}")
+        
+        # Use selling price for POS (wholesale logic can be added based on customer)
+        price = prod.selling_price
+        
+        item_total = price * item.quantity
+        gst_amount = item_total * (prod.gst_rate / 100) if data.apply_gst else 0
+        
+        items_valid.append({
+            "product_id": prod.id,
+            "product_name": prod.name,
+            "sku": prod.sku,
+            "quantity": item.quantity,
+            "price": price,
+            "total": item_total + gst_amount,
+            "gst_amount": gst_amount,
+            "gst_rate": prod.gst_rate,
+            "image_url": prod.images[0] if prod.images else None
+        })
+        subtotal += item_total
+        
+        # Update stock
+        prod.stock_qty -= item.quantity
+
+    # Calculate totals
+    total_gst = sum(i["gst_amount"] for i in items_valid)
+    
+    # Handle discount
+    discount_amount = data.discount_amount
+    if data.discount_percentage > 0:
+        discount_amount = subtotal * (data.discount_percentage / 100)
+    
+    grand_total = subtotal + total_gst - discount_amount
+    
+    # Create order
+    new_order = models.Order(
+        id=generate_id(),
+        order_number=generate_order_number(),
+        user_id=None,  # POS sales may not have user accounts
+        customer_phone=data.customer_phone,
+        items=items_valid,
+        subtotal=subtotal,
+        gst_applied=data.apply_gst,
+        gst_total=total_gst,
+        discount_amount=discount_amount,
+        grand_total=grand_total,
+        shipping_address=data.shipping_address,
+        payment_method=data.payment_method,
+        payment_status="paid",  # POS sales are paid immediately
+        status="completed",  # POS sales are completed immediately
+        is_offline=True,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
+    )
+    db.add(new_order)
+    db.commit()
+    db.refresh(new_order)
+    
+    return new_order
+
+@api_router.get("/admin/pos/search-customer")
+def search_customer(phone: str, admin: dict = Depends(admin_required), db: Session = Depends(get_db)):
+    """Search for customer by phone number"""
+    if not phone or len(phone) < 10:
+        raise HTTPException(status_code=400, detail="Invalid phone number")
+    
+    user = db.query(models.User).filter(models.User.phone == phone).first()
+    
+    if not user:
+        return None
+    
+    return {
+        "id": user.id,
+        "name": user.name,
+        "phone": user.phone,
+        "email": user.email,
+        "is_seller": user.supplier_status == "approved"
+    }
+
+
 @api_router.post("/orders")
 def create_order(data: OrderCreate, request: Request, db: Session = Depends(get_db)):
     user = get_current_user_optional(request, db)
@@ -3780,10 +3874,33 @@ def get_inventory_report(
 ):
     products = db.query(models.Product).all()
     
+    # Calculate sold quantities from completed orders (both online and offline)
+    completed_orders = db.query(models.Order).filter(
+        models.Order.status.in_(["completed", "delivered"])
+    ).all()
+    
+    # Build a map of product_id -> total_sold_qty
+    sold_qty_map = {}
+    for order in completed_orders:
+        if order.items:
+            for item in order.items:
+                product_id = item.get("product_id")
+                quantity = item.get("quantity", 0)
+                if product_id:
+                    sold_qty_map[product_id] = sold_qty_map.get(product_id, 0) + quantity
+    
     total_products = len(products)
     total_stock_value = sum(p.stock_qty * p.cost_price for p in products)
-    low_stock_products = [p for p in products if p.stock_qty <= p.low_stock_threshold]
-    out_of_stock_products = [p for p in products if p.stock_qty == 0]
+    low_stock_products = []
+    out_of_stock_products = []
+    
+    # Enrich products with sold_qty
+    for p in products:
+        p.sold_qty = sold_qty_map.get(p.id, 0)
+        if p.stock_qty <= p.low_stock_threshold:
+            low_stock_products.append(p)
+        if p.stock_qty == 0:
+            out_of_stock_products.append(p)
     
     return {
         "summary": {
@@ -3795,6 +3912,7 @@ def get_inventory_report(
         "low_stock_products": low_stock_products,
         "out_of_stock_products": out_of_stock_products
     }
+
 
 @api_router.get("/admin/reports/profit-loss")
 def get_profit_loss_report(
@@ -3863,6 +3981,20 @@ def get_inventory_status_report(admin: dict = Depends(admin_required), db: Sessi
         # Get all products with their current stock
         products = db.query(models.Product).filter(models.Product.is_active == True).all()
         
+        # Calculate sold quantities from completed orders (reuse logic from inventory report)
+        completed_orders = db.query(models.Order).filter(
+            models.Order.status.in_(["completed", "delivered"])
+        ).all()
+        
+        sold_qty_map = {}
+        for order in completed_orders:
+            if order.items:
+                for item in order.items:
+                    product_id = item.get("product_id")
+                    quantity = item.get("quantity", 0)
+                    if product_id:
+                        sold_qty_map[product_id] = sold_qty_map.get(product_id, 0) + quantity
+        
         inventory_report = []
         
         for product in products:
@@ -3880,6 +4012,12 @@ def get_inventory_status_report(admin: dict = Depends(admin_required), db: Sessi
             # Calculate available quantity (stock - blocked)
             available_qty = max(0, product.stock_qty - blocked_qty)
             
+            # Get sold quantity
+            sold_qty = sold_qty_map.get(product.id, 0)
+            
+            # Calculate original stock (current + sold)
+            original_stock = product.stock_qty + sold_qty
+            
             # Determine stock status
             if product.stock_qty <= 0:
                 stock_status = "out_of_stock"
@@ -3895,9 +4033,11 @@ def get_inventory_status_report(admin: dict = Depends(admin_required), db: Sessi
                 "product_name": product.name,
                 "sku": product.sku,
                 "category_name": product.category.name if product.category else "Uncategorized",
+                "original_stock": original_stock,
                 "total_stock": product.stock_qty,
                 "blocked_qty": blocked_qty,
                 "available_qty": available_qty,
+                "sold_qty": sold_qty,
                 "low_stock_threshold": product.low_stock_threshold,
                 "stock_status": stock_status,
                 "selling_price": product.selling_price,

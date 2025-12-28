@@ -11,8 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Separator } from '../../components/ui/separator';
 import { productsAPI, posAPI, paymentAPI, productLookupAPI } from '../../lib/api';
 import { toast } from 'sonner';
-import { 
-  Search, Plus, Minus, Trash2, ShoppingCart, User, CreditCard, Banknote, 
+import {
+  Search, Plus, Minus, Trash2, ShoppingCart, User, CreditCard, Banknote,
   Printer, QrCode, Scan, Receipt, Percent, UserPlus, X
 } from 'lucide-react';
 
@@ -34,7 +34,7 @@ export default function AdminPOS() {
   const [lastOrder, setLastOrder] = useState(null);
   const [showAddCustomer, setShowAddCustomer] = useState(false);
   const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', email: '' });
-  
+
   const scanInputRef = useRef(null);
 
   useEffect(() => {
@@ -69,15 +69,17 @@ export default function AdminPOS() {
     }
   };
 
-  const handleScanInput = async (e) => {
+  const handleScanInput = (e) => {
     if (e.key === 'Enter' && scanInput) {
-      try {
-        const response = await productLookupAPI.bySku(scanInput);
-        if (response.data) {
-          addToCart(response.data);
-          toast.success(`Added: ${response.data.name}`);
-        }
-      } catch (error) {
+      // Search in locally loaded products instead of API call
+      const product = products.find(p =>
+        p.sku.toUpperCase() === scanInput.toUpperCase()
+      );
+
+      if (product) {
+        addToCart(product);
+        toast.success(`Added: ${product.name}`);
+      } else {
         toast.error('Product not found');
       }
       setScanInput('');
@@ -89,7 +91,7 @@ export default function AdminPOS() {
       toast.error('Product out of stock');
       return;
     }
-    
+
     setCart(prev => {
       const existing = prev.find(item => item.product.id === product.id);
       if (existing) {
@@ -126,14 +128,14 @@ export default function AdminPOS() {
   };
 
   const getSubtotal = () => cart.reduce((sum, item) => {
-    const price = customer?.is_seller && item.product.wholesale_price 
-      ? item.product.wholesale_price 
+    const price = customer?.is_seller && item.product.wholesale_price
+      ? item.product.wholesale_price
       : item.product.selling_price;
     return sum + price * item.quantity;
   }, 0);
 
   const getGST = () => applyGST ? getSubtotal() * 0.18 : 0;
-  
+
   const getDiscount = () => {
     if (discountType === 'percentage' && discountValue) {
       return getSubtotal() * (parseFloat(discountValue) / 100);
@@ -142,7 +144,7 @@ export default function AdminPOS() {
     }
     return 0;
   };
-  
+
   const getTotal = () => getSubtotal() + getGST() - getDiscount();
 
   const generateQR = async () => {
@@ -190,11 +192,11 @@ export default function AdminPOS() {
       const response = await posAPI.createSale(orderData);
       setLastOrder(response.data);
       toast.success(`Sale completed! Order #${response.data.order_number}`);
-      
+
       // Show invoice dialog
       setShowInvoiceDialog(true);
       setShowQRDialog(false);
-      
+
       // Reset
       setCart([]);
       setDiscountValue('');
@@ -209,7 +211,7 @@ export default function AdminPOS() {
 
   const printInvoice = () => {
     if (!lastOrder) return;
-    
+
     const printWindow = window.open('', '_blank');
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -217,50 +219,247 @@ export default function AdminPOS() {
       <head>
         <title>Invoice - ${lastOrder.order_number}</title>
         <style>
-          body { font-family: Arial, sans-serif; padding: 20px; max-width: 300px; margin: 0 auto; }
-          .header { text-align: center; margin-bottom: 20px; }
-          .header h1 { margin: 0; font-size: 18px; }
-          .header p { margin: 5px 0; font-size: 12px; color: #666; }
-          table { width: 100%; border-collapse: collapse; font-size: 12px; }
-          th, td { padding: 5px; text-align: left; border-bottom: 1px dashed #ccc; }
-          .total { font-weight: bold; font-size: 14px; }
-          .footer { text-align: center; margin-top: 20px; font-size: 10px; color: #666; }
-          @media print { body { padding: 0; } }
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { 
+            font-family: 'Arial', sans-serif; 
+            padding: 20px; 
+            max-width: 800px; 
+            margin: 0 auto;
+            color: #333;
+          }
+          .header { 
+            text-align: center; 
+            margin-bottom: 30px; 
+            border-bottom: 2px solid #333;
+            padding-bottom: 15px;
+          }
+          .header h1 { 
+            margin: 0; 
+            font-size: 28px; 
+            font-weight: bold;
+            margin-bottom: 5px;
+          }
+          .header .phone {
+            font-size: 14px;
+            color: #666;
+            margin: 5px 0;
+          }
+          .invoice-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 5px;
+          }
+          .invoice-info div {
+            flex: 1;
+          }
+          .invoice-info strong {
+            display: block;
+            margin-bottom: 5px;
+            color: #000;
+          }
+          table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin: 20px 0;
+          }
+          th { 
+            background: #333;
+            color: white;
+            padding: 12px 8px;
+            text-align: left;
+            font-size: 12px;
+            text-transform: uppercase;
+            border: 1px solid #333;
+          }
+          td { 
+            padding: 10px 8px;
+            border: 1px solid #ddd;
+            font-size: 12px;
+          }
+          tr:nth-child(even) {
+            background: #f9f9f9;
+          }
+          .product-cell {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+          }
+          .product-img {
+            width: 50px;
+            height: 50px;
+            object-fit: cover;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+          }
+          .product-info {
+            flex: 1;
+          }
+          .product-name {
+            font-weight: bold;
+            margin-bottom: 3px;
+          }
+          .product-sku {
+            color: #666;
+            font-size: 11px;
+          }
+          .text-right { text-align: right; }
+          .text-center { text-align: center; }
+          .totals-section {
+            margin-top: 20px;
+            float: right;
+            width: 300px;
+          }
+          .totals-table {
+            width: 100%;
+            border: 1px solid #ddd;
+          }
+          .totals-table td {
+            padding: 8px;
+            border: 1px solid #ddd;
+          }
+          .totals-table .label {
+            font-weight: normal;
+            background: #f5f5f5;
+          }
+          .totals-table .total-row {
+            font-weight: bold;
+            font-size: 14px;
+            background: #333;
+            color: white;
+          }
+          .footer { 
+            clear: both;
+            text-align: center; 
+            margin-top: 40px; 
+            padding-top: 20px;
+            border-top: 2px solid #333;
+            font-size: 12px; 
+            color: #666; 
+          }
+          .payment-info {
+            margin: 20px 0;
+            padding: 10px;
+            background: #f0f0f0;
+            border-left: 4px solid #333;
+            font-size: 13px;
+          }
+          @media print { 
+            body { padding: 10px; }
+            .no-print { display: none; }
+          }
         </style>
       </head>
       <body>
         <div class="header">
-          <h1>Amorlias Mart</h1>
-          <p>Invoice #${lastOrder.order_number}</p>
-          <p>${new Date(lastOrder.created_at).toLocaleString('en-IN')}</p>
+          <h1>Amorlias International Pvt Ltd</h1>
+          <p class="phone">+918447781198</p>
         </div>
+        
+        <div class="invoice-info">
+          <div>
+            <strong>Order ID:</strong>
+            <span>${lastOrder.order_number}</span>
+          </div>
+          <div>
+            <strong>Date:</strong>
+            <span>${new Date(lastOrder.created_at).toLocaleString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })}</span>
+          </div>
+          <div>
+            <strong>Total Products:</strong>
+            <span>${lastOrder.items.reduce((sum, item) => sum + item.quantity, 0)}</span>
+          </div>
+        </div>
+
         <table>
           <thead>
-            <tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr>
+            <tr>
+              <th style="width: 50px;">No.</th>
+              <th>Product</th>
+              <th style="width: 80px;" class="text-center">Qty</th>
+              <th style="width: 100px;" class="text-right">Price</th>
+              <th style="width: 80px;" class="text-center">Tax</th>
+              <th style="width: 100px;" class="text-right">Subtotal</th>
+              <th style="width: 100px;" class="text-right">Total</th>
+            </tr>
           </thead>
           <tbody>
-            ${lastOrder.items.map(item => `
-              <tr>
-                <td>${item.product_name}</td>
-                <td>${item.quantity}</td>
-                <td>₹${item.price}</td>
-                <td>₹${(item.price * item.quantity).toFixed(2)}</td>
-              </tr>
-            `).join('')}
+            ${lastOrder.items.map((item, index) => {
+      const itemSubtotal = item.price * item.quantity;
+      const gstRate = item.gst_rate || 18;
+      const itemTotal = item.total || (itemSubtotal + (itemSubtotal * gstRate / 100));
+      return `
+                <tr>
+                  <td class="text-center">${index + 1}</td>
+                  <td>
+                    <div class="product-cell">
+                      ${item.image_url ? `<img src="${item.image_url}" class="product-img" alt="${item.product_name}">` : ''}
+                      <div class="product-info">
+                        <div class="product-name">${item.product_name}</div>
+                        <div class="product-sku">${item.sku || 'N/A'}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="text-center">${item.quantity}</td>
+                  <td class="text-right">₹${item.price.toFixed(2)}</td>
+                  <td class="text-center">${lastOrder.gst_applied ? `${gstRate}% GST` : '-'}</td>
+                  <td class="text-right">₹${itemSubtotal.toFixed(2)}</td>
+                  <td class="text-right">₹${itemTotal.toFixed(2)}</td>
+                </tr>
+              `;
+    }).join('')}
           </tbody>
         </table>
-        <table style="margin-top: 10px;">
-          <tr><td>Subtotal</td><td style="text-align: right;">₹${lastOrder.subtotal.toFixed(2)}</td></tr>
-          ${lastOrder.gst_applied ? `<tr><td>GST (18%)</td><td style="text-align: right;">₹${lastOrder.gst_total.toFixed(2)}</td></tr>` : ''}
-          ${lastOrder.discount_amount > 0 ? `<tr><td>Discount</td><td style="text-align: right;">-₹${lastOrder.discount_amount.toFixed(2)}</td></tr>` : ''}
-          <tr class="total"><td>Grand Total</td><td style="text-align: right;">₹${lastOrder.grand_total.toFixed(2)}</td></tr>
-        </table>
-        <p style="margin-top: 10px; font-size: 12px;">Payment: ${lastOrder.payment_method.toUpperCase()}</p>
+
+        <div class="totals-section">
+          <table class="totals-table">
+            <tr>
+              <td class="label">Subtotal</td>
+              <td class="text-right">₹${lastOrder.subtotal.toFixed(2)}</td>
+            </tr>
+            ${lastOrder.gst_applied ? `
+              <tr>
+                <td class="label">GST (18%)</td>
+                <td class="text-right">₹${lastOrder.gst_total.toFixed(2)}</td>
+              </tr>
+            ` : ''}
+            ${lastOrder.discount_amount > 0 ? `
+              <tr>
+                <td class="label">Discount</td>
+                <td class="text-right" style="color: #e74c3c;">-₹${lastOrder.discount_amount.toFixed(2)}</td>
+              </tr>
+            ` : ''}
+            <tr class="total-row">
+              <td>TOTAL</td>
+              <td class="text-right">₹${lastOrder.grand_total.toFixed(2)}</td>
+            </tr>
+          </table>
+        </div>
+
+        <div class="payment-info">
+          <strong>Payment Method:</strong> ${lastOrder.payment_method.toUpperCase()}
+        </div>
+
         <div class="footer">
-          <p>Thank you for shopping with us!</p>
+          <p><strong>Thank you for shopping with us!</strong></p>
           <p>Visit again</p>
         </div>
-        <script>window.print(); window.close();</script>
+        
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.print();
+            }, 500);
+          };
+        </script>
       </body>
       </html>
     `);
@@ -317,9 +516,8 @@ export default function AdminPOS() {
             {filteredProducts.map((product) => (
               <Card
                 key={product.id}
-                className={`bg-slate-800 border-slate-700 cursor-pointer transition-all hover:border-primary ${
-                  product.stock_qty <= 0 ? 'opacity-50' : ''
-                }`}
+                className={`bg-slate-800 border-slate-700 cursor-pointer transition-all hover:border-primary ${product.stock_qty <= 0 ? 'opacity-50' : ''
+                  }`}
                 onClick={() => addToCart(product)}
                 data-testid={`pos-product-${product.id}`}
               >
@@ -411,8 +609,8 @@ export default function AdminPOS() {
                 </TableHeader>
                 <TableBody>
                   {cart.map((item) => {
-                    const price = customer?.is_seller && item.product.wholesale_price 
-                      ? item.product.wholesale_price 
+                    const price = customer?.is_seller && item.product.wholesale_price
+                      ? item.product.wholesale_price
                       : item.product.selling_price;
                     return (
                       <TableRow key={item.product.id} className="border-slate-700">
@@ -567,9 +765,9 @@ export default function AdminPOS() {
             <div className="text-center">
               <div className="bg-white p-4 rounded-lg inline-block mb-4">
                 {qrData.qr_code ? (
-                  <img 
-                    src={qrData.qr_code} 
-                    alt="Payment QR Code" 
+                  <img
+                    src={qrData.qr_code}
+                    alt="Payment QR Code"
                     className="w-48 h-48"
                   />
                 ) : (
@@ -652,12 +850,12 @@ export default function AdminPOS() {
                 className="input-admin"
               />
             </div>
-            <Button 
+            <Button
               onClick={() => {
                 setCustomerPhone(newCustomer.phone);
                 setShowAddCustomer(false);
                 toast.success('Customer info added');
-              }} 
+              }}
               className="w-full bg-primary"
             >
               Add Customer

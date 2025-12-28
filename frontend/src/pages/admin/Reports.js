@@ -197,11 +197,20 @@ export default function AdminReports() {
                       <div className="space-y-2">
                         {inventoryReport.low_stock_products.map((product) => (
                           <div key={product.id} className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
-                            <div>
+                            <div className="flex-1">
                               <p className="font-medium truncate max-w-[200px]">{product.name}</p>
                               <p className="text-xs text-slate-400">{product.sku}</p>
                             </div>
-                            <span className="text-amber-400 font-semibold">{product.stock_qty} left</span>
+                            <div className="flex gap-4 items-center">
+                              <div className="text-right">
+                                <p className="text-xs text-slate-400">Sold</p>
+                                <span className="text-blue-400 font-semibold">{product.sold_qty || 0}</span>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-xs text-slate-400">Stock</p>
+                                <span className="text-amber-400 font-semibold">{product.stock_qty}</span>
+                              </div>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -220,11 +229,20 @@ export default function AdminReports() {
                       <div className="space-y-2">
                         {inventoryReport.out_of_stock_products.map((product) => (
                           <div key={product.id} className="flex items-center justify-between p-3 bg-slate-700/50 rounded-lg">
-                            <div>
+                            <div className="flex-1">
                               <p className="font-medium truncate max-w-[200px]">{product.name}</p>
                               <p className="text-xs text-slate-400">{product.sku}</p>
                             </div>
-                            <span className="text-red-400 font-semibold">0</span>
+                            <div className="flex gap-4 items-center">
+                              <div className="text-right">
+                                <p className="text-xs text-slate-400">Sold</p>
+                                <span className="text-blue-400 font-semibold">{product.sold_qty || 0}</span>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-xs text-slate-400">Stock</p>
+                                <span className="text-red-400 font-semibold">0</span>
+                              </div>
+                            </div>
                           </div>
                         ))}
                       </div>
