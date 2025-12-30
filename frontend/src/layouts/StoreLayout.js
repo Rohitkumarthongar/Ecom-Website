@@ -98,7 +98,6 @@ export const StoreHeader = () => {
                 <span className="text-white font-extrabold text-xl">{settings?.business_name?.[0] || 'B'}</span>
               </div>
             )}
-            <span className="text-xl font-extrabold text-foreground hidden sm:block">{settings?.business_name || 'Amorlias'}</span>
           </Link>
 
           {/* Search Bar - Desktop */}
@@ -386,7 +385,6 @@ export const StoreFooter = () => {
                   <span className="text-white font-extrabold text-xl">{settings?.business_name?.[0] || 'B'}</span>
                 </div>
               )}
-              <span className="text-xl font-extrabold">{settings?.business_name || 'Amorlias'}</span>
             </div>
             <p className="text-slate-400 text-sm">
               India's favorite online marketplace for fashion, electronics, and more.

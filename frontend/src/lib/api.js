@@ -59,7 +59,7 @@ export const categoriesAPI = {
   getOne: (id) => api.get(`/categories/${id}`),
   create: (data) => api.post('/admin/categories', data),
   update: (id, data) => api.put(`/admin/categories/${id}`, data),
-  delete: (id) => api.delete(`/admin/categories/${id}`),
+  delete: (id) => api.delete(`/admin/categories/${id}`, data),
 };
 
 // Inventory API
@@ -70,21 +70,21 @@ export const inventoryAPI = {
 
 // Orders API
 export const ordersAPI = {
-  create: (data) => api.post('/orders', data),
-  getUserOrders: () => api.get('/orders'),
-  getOne: (id) => api.get(`/orders/${id}`),
+  create: (data) => api.post('/orders/', data),
+  getUserOrders: () => api.get('/orders/'),
+  getOne: (id) => api.get(`/orders/${id}/`),
   getAll: (params) => api.get('/admin/orders', { params }),
-  updateStatus: (id, data) => api.put(`/admin/orders/${id}/status`, data),
-  getInvoice: (id) => api.get(`/admin/orders/${id}/invoice`, { responseType: 'blob' }),
-  getShippingLabel: (id) => api.get(`/admin/orders/${id}/shipping-label`, { responseType: 'blob' }),
-  getLabel: (id) => api.get(`/courier/label/${id}`, { responseType: 'blob' }),
+  updateStatus: (id, data) => api.put(`/admin/orders/${id}/status/`, data),
+  getInvoice: (id) => api.get(`/admin/orders/${id}/invoice/`, { responseType: 'blob' }),
+  getShippingLabel: (id) => api.get(`/admin/orders/${id}/shipping-label/`, { responseType: 'blob' }),
+  getLabel: (id) => api.get(`/courier/label/${id}/`, { responseType: 'blob' }),
   // Cancellation endpoints
-  checkCancellationEligibility: (id) => api.get(`/orders/${id}/can-cancel`),
-  cancelOrder: (id, data) => api.post(`/orders/${id}/cancel`, data),
+  checkCancellationEligibility: (id) => api.get(`/orders/${id}/can-cancel/`),
+  cancelOrder: (id, data) => api.post(`/orders/${id}/cancel/`, data),
   // Return endpoints
-  checkReturnEligibility: (id) => api.get(`/orders/${id}/can-return`),
-  createReturn: (id, data) => api.post(`/orders/${id}/return`, data),
-  getOrderReturns: (id) => api.get(`/orders/${id}/returns`),
+  checkReturnEligibility: (id) => api.get(`/orders/${id}/can-return/`),
+  createReturn: (id, data) => api.post(`/orders/${id}/return/`, data),
+  getOrderReturns: (id) => api.get(`/orders/${id}/returns/`),
 };
 
 // POS API
@@ -119,7 +119,7 @@ export const offersAPI = {
   getAll: () => api.get('/offers'),
   create: (data) => api.post('/admin/offers', data),
   update: (id, data) => api.put(`/admin/offers/${id}`, data),
-  delete: (id) => api.delete(`/admin/offers/${id}`),
+  delete: (id) => api.delete(`/admin/offers/${id}`, data),
 };
 
 // Couriers API
@@ -127,7 +127,7 @@ export const couriersAPI = {
   getAll: () => api.get('/admin/couriers'),
   create: (data) => api.post('/admin/couriers', data),
   update: (id, data) => api.put(`/admin/couriers/${id}`, data),
-  delete: (id) => api.delete(`/admin/couriers/${id}`),
+  delete: (id) => api.delete(`/admin/couriers/${id}`, data),
 };
 
 // Payment Gateways API
@@ -135,13 +135,13 @@ export const paymentGatewaysAPI = {
   getAll: () => api.get('/admin/payment-gateways'),
   create: (data) => api.post('/admin/payment-gateways', data),
   update: (id, data) => api.put(`/admin/payment-gateways/${id}`, data),
-  delete: (id) => api.delete(`/admin/payment-gateways/${id}`),
+  delete: (id) => api.delete(`/admin/payment-gateways/${id}`, data),
 };
 
 // Settings API
 export const settingsAPI = {
-  get: () => api.get('/admin/settings'),
-  update: (data) => api.put('/admin/settings', data),
+  get: () => api.get('/admin/settings/'),
+  update: (data) => api.put('/admin/settings/', data),
   getPublic: () => api.get('/settings/public'),
   getEmailSettings: () => api.get('/admin/settings/email'),
   testEmail: (data) => api.post('/admin/settings/email/test', data),
@@ -203,6 +203,13 @@ export const sellerRequestsAPI = {
   request: (data) => api.post('/auth/request-seller', data),
   getAll: (params) => api.get('/admin/seller-requests', { params }),
   update: (id, data) => api.put(`/admin/seller-requests/${id}`, data),
+};
+
+// Team API
+export const teamAPI = {
+  getAll: () => api.get('/admin/team'),
+  create: (data) => api.post('/admin/team', data),
+  delete: (id) => api.delete(`/admin/team/${id}`),
 };
 
 // Customers API

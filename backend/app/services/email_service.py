@@ -26,13 +26,16 @@ class EmailService:
             db = SessionLocal()
             db_settings = db.query(models.Settings).filter(models.Settings.type == "business").first()
             if db_settings and db_settings.smtp_user:
+                # Get configs for extra settings
+                configs = db_settings.configs or {}
+                
                 config = {
                     "SMTP_HOST": db_settings.smtp_host or settings.SMTP_HOST or 'smtp.gmail.com',
                     "SMTP_PORT": db_settings.smtp_port or settings.SMTP_PORT or 587,
                     "SMTP_USERNAME": db_settings.smtp_user or settings.SMTP_USER or '',
                     "SMTP_PASSWORD": db_settings.smtp_password or settings.SMTP_PASSWORD or '',
                     "SMTP_FROM_EMAIL": db_settings.smtp_user or settings.SMTP_USER or 'support@bharatbazaar.com',
-                    "SMTP_FROM_NAME": settings.EMAIL_FROM_NAME or 'BharatBazaar',
+                    "SMTP_FROM_NAME": configs.get("smtp_from_name") or settings.EMAIL_FROM_NAME or 'BharatBazaar',
                     "EMAIL_ENABLED": db_settings.email_enabled == "true" if db_settings.email_enabled else settings.EMAIL_ENABLED
                 }
                 db.close()

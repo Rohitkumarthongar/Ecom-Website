@@ -133,6 +133,7 @@ export default function AdminSettings() {
         smtp_port: emailSettings.smtp_port,
         smtp_user: emailSettings.smtp_username,
         smtp_password: emailSettings.smtp_password || undefined,
+        smtp_from_name: emailSettings.smtp_from_name,
       });
       toast.success('Email settings saved successfully');
       fetchEmailSettings(); // Refresh
