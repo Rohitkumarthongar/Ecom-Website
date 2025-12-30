@@ -1,15 +1,21 @@
+"""
+Courier Service - Delhivery Integration
+"""
 import requests
 import json
 import logging
 from datetime import datetime, timedelta
+from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
 class DelhiveryService:
-    BASE_URL = "https://track.delhivery.com" # Production URL
-    # BASE_URL = "https://staging-express.delhivery.com" # Staging URL
+    """Delhivery courier service integration"""
     
-    def __init__(self, token):
+    BASE_URL = "https://track.delhivery.com"  # Production URL
+    # BASE_URL = "https://staging-express.delhivery.com"  # Staging URL
+    
+    def __init__(self, token: str):
         self.token = token
         self.headers = {
             "Authorization": f"Token {self.token}",
@@ -17,37 +23,25 @@ class DelhiveryService:
             "Accept": "application/json"
         }
 
-    def check_serviceability(self, pincode):
-        """
-        Check if a pincode is serviceable.
-        API: /c/api/pin-codes/json/
-        """
+    def check_serviceability(self, pincode: str) -> Dict[str, Any]:
+        """Check if a pincode is serviceable"""
         try:
-            # For testing purposes, let's return a mock response if the API fails
             url = f"{self.BASE_URL}/c/api/pin-codes/json/"
             params = {"filter_codes": pincode}
             
-            # Add timeout to prevent hanging
             response = requests.get(url, headers=self.headers, params=params, timeout=10)
             
             if response.status_code == 200:
                 data = response.json()
                 delivery_codes = data.get("delivery_codes", [])
                 
-                # If API returns successfully but with no codes, it means not serviceable
                 if not delivery_codes:
-                     return {"serviceable": False}
+                    return {"serviceable": False}
 
-                # Delhivery returns { "delivery_codes": [ { "postal_code": { "pin": ... } } ] }
                 for item in delivery_codes:
-                    # The API response has a wrapper key 'postal_code' containing the actual details
-                    details = item.get("postal_code")
-                    if not details:
-                        # Fallback for flat structure if API varies
-                        details = item
-                        
-                    # Check if pin matches (comparing as string/int safely)
+                    details = item.get("postal_code", item)
                     api_pin = details.get("pin")
+                    
                     if str(api_pin) == str(pincode):
                         return {
                             "serviceable": True,
@@ -62,10 +56,8 @@ class DelhiveryService:
                             "delivery_charge": 40 if details.get("state_code") == "RJ" else 80
                         }
                 
-                # If we iterated but didn't find exact match
                 return {"serviceable": False}
                         
-            # If API call fails or pincode not found, return mock data for testing
             logger.warning(f"Delhivery API returned {response.status_code}: {response.text}")
             
             # Return mock serviceable data for testing
@@ -86,7 +78,6 @@ class DelhiveryService:
         except Exception as e:
             logger.error(f"Delhivery Serviceability Error: {str(e)}")
             
-            # Return mock serviceable data for testing
             return {
                 "serviceable": True,
                 "cod": True,
@@ -98,16 +89,13 @@ class DelhiveryService:
                 "note": f"Mock data - Error: {str(e)}"
             }
 
-    def validate_address(self, address_data):
-        """
-        Validate complete address including pincode serviceability
-        """
+    def validate_address(self, address_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate complete address including pincode serviceability"""
         try:
             pincode = address_data.get("pincode")
             if not pincode:
                 return {"valid": False, "error": "Pincode is required"}
             
-            # Check serviceability
             serviceability = self.check_serviceability(pincode)
             
             if not serviceability.get("serviceable"):
@@ -117,7 +105,6 @@ class DelhiveryService:
                     "serviceability": serviceability
                 }
             
-            # Validate required fields
             required_fields = ["name", "phone", "line1", "city", "state"]
             missing_fields = [field for field in required_fields if not address_data.get(field)]
             
@@ -127,7 +114,6 @@ class DelhiveryService:
                     "error": f"Missing required fields: {', '.join(missing_fields)}"
                 }
             
-            # Validate phone number
             phone = str(address_data.get("phone", "")).strip()
             if len(phone) < 10:
                 return {"valid": False, "error": "Invalid phone number"}
@@ -141,22 +127,17 @@ class DelhiveryService:
         except Exception as e:
             return {"valid": False, "error": str(e)}
 
-    def _calculate_delivery_estimate(self, city):
+    def _calculate_delivery_estimate(self, city: Optional[str]) -> str:
         """Calculate estimated delivery days based on city"""
-        # This is a simplified estimation - in real scenario, you'd use Delhivery's API
         metro_cities = ["Mumbai", "Delhi", "Bangalore", "Chennai", "Kolkata", "Hyderabad", "Pune", "Ahmedabad"]
         if city in metro_cities:
             return "1-2 business days"
         else:
             return "2-4 business days"
 
-    def create_surface_order(self, order_data):
-        """
-        Create a Surface/Express shipment.
-        API: /c/api/og/v2/shipment/
-        """
+    def create_surface_order(self, order_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a Surface/Express shipment"""
         try:
-            # Validate required fields
             required_fields = ["name", "address", "pincode", "city", "state", "phone", "order_id", "date"]
             missing_fields = [field for field in required_fields if not order_data.get(field)]
             
@@ -164,13 +145,11 @@ class DelhiveryService:
                 logger.error(f"Missing required fields for Delhivery shipment: {missing_fields}")
                 return {"success": False, "error": f"Missing required fields: {', '.join(missing_fields)}"}
             
-            # Validate phone number (should be 10 digits)
             phone = str(order_data.get("phone", "")).strip()
             if not phone or len(phone) < 10:
                 logger.error(f"Invalid phone number: {phone}")
                 return {"success": False, "error": "Invalid phone number. Must be at least 10 digits."}
             
-            # Validate pincode (should be 6 digits)
             pincode = str(order_data.get("pincode", "")).strip()
             if not pincode or len(pincode) != 6 or not pincode.isdigit():
                 logger.error(f"Invalid pincode: {pincode}")
@@ -178,7 +157,6 @@ class DelhiveryService:
             
             url = f"{self.BASE_URL}/api/cmu/create.json"
             
-            # Payload construction matching Delhivery API requirements
             payload = {
                 "format": "json",
                 "data": json.dumps({
@@ -220,13 +198,10 @@ class DelhiveryService:
                 })
             }
             
-            # Remove Content-Type: application/json from headers for form-data
             headers = self.headers.copy()
             headers.pop("Content-Type", None)
             
             logger.info(f"Creating Delhivery Shipment for order {order_data['order_id']}")
-            logger.debug(f"Delhivery Payload: {json.dumps(payload, indent=2)}")
-            
             response = requests.post(url, headers=headers, data=payload, timeout=30)
             
             logger.info(f"Delhivery Response: {response.status_code} - {response.text}")
@@ -234,7 +209,6 @@ class DelhiveryService:
             if response.status_code == 200:
                 res_json = response.json()
                 
-                # Check if the response contains packages
                 if res_json.get("packages"):
                     pkg = res_json["packages"][0]
                     if pkg.get("status") == "Success":
@@ -248,7 +222,6 @@ class DelhiveryService:
                         logger.error(f"Delhivery shipment creation failed: {error_msg}")
                         return {"success": False, "error": error_msg}
                 
-                # Check for direct success response
                 elif res_json.get("success"):
                     return {
                         "success": True,
@@ -279,35 +252,32 @@ class DelhiveryService:
                 return {"success": False, "error": error_msg}
 
         except Exception as e:
-             logger.error(f"Delhivery Create Order Error: {str(e)}")
-             return {"success": False, "error": str(e)}
+            logger.error(f"Delhivery Create Order Error: {str(e)}")
+            return {"success": False, "error": str(e)}
 
-    def track_order(self, awb):
-        """
-        Track shipment by AWB with detailed status information.
-        API: /api/v1/packages/json/
-        """
+    def track_order(self, awb: str) -> Dict[str, Any]:
+        """Track shipment by AWB with detailed status information"""
         try:
             if awb == "MOCK_DELIVERED":
-                 return {
-                     "success": True,
-                     "awb": awb,
-                     "status": "Delivered",
-                     "current_location": "Customer Address",
-                     "destination": "Customer Address",
-                     "expected_delivery": datetime.now().strftime("%Y-%m-%d"),
-                     "cod_amount": 0,
-                     "tracking_history": [
-                         {
-                             "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                             "status": "Delivered",
-                             "location": "Customer Address",
-                             "instructions": "Delivered to customer",
-                             "status_code": "DL"
-                         }
-                     ],
-                     "note": "Forced Mock Delivered"
-                 }
+                return {
+                    "success": True,
+                    "awb": awb,
+                    "status": "Delivered",
+                    "current_location": "Customer Address",
+                    "destination": "Customer Address",
+                    "expected_delivery": datetime.now().strftime("%Y-%m-%d"),
+                    "cod_amount": 0,
+                    "tracking_history": [
+                        {
+                            "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            "status": "Delivered",
+                            "location": "Customer Address",
+                            "instructions": "Delivered to customer",
+                            "status_code": "DL"
+                        }
+                    ],
+                    "note": "Forced Mock Delivered"
+                }
 
             url = f"{self.BASE_URL}/api/v1/packages/json/"
             params = {"waybill": awb, "token": self.token}
@@ -318,7 +288,6 @@ class DelhiveryService:
                 if data.get("ShipmentData"):
                     shipment_data = data["ShipmentData"][0].get("Shipment", {})
                     
-                    # Parse tracking history
                     scans = shipment_data.get("Scans", [])
                     tracking_history = []
                     
@@ -344,6 +313,7 @@ class DelhiveryService:
                     }
                 else:
                     return {"success": False, "error": "No tracking data found"}
+            
             return {
                 "success": True,
                 "awb": awb,
@@ -359,55 +329,50 @@ class DelhiveryService:
                         "location": "Warehouse",
                         "instructions": "Package picked up from seller",
                         "status_code": "PU"
-                     },
-                     {
-                         "date": (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S"),
-                         "status": "In Transit",
-                         "location": "Jaipur Hub",
-                         "instructions": "Package arrived at facility",
-                         "status_code": "IT"
-                     }
-                 ],
-                 "note": f"Mock data - API returned {response.status_code}"
-             }
+                    },
+                    {
+                        "date": (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S"),
+                        "status": "In Transit",
+                        "location": "Jaipur Hub",
+                        "instructions": "Package arrived at facility",
+                        "status_code": "IT"
+                    }
+                ],
+                "note": f"Mock data - API returned {response.status_code}"
+            }
         except Exception as e:
-             logger.error(f"Tracking error: {str(e)}")
-             
-             # Return robust mock tracking data for testing/UI validation
-             return {
-                 "success": True,
-                 "awb": awb,
-                 "status": "In Transit",
-                 "current_location": "Jaipur Hub",
-                 "destination": "Govindgarh",
-                 "expected_delivery": (datetime.now() + timedelta(days=2)).strftime("%Y-%m-%d"),
-                 "cod_amount": 0,
-                 "tracking_history": [
-                     {
-                         "date": (datetime.now() - timedelta(days=2)).strftime("%Y-%m-%d %H:%M:%S"),
-                         "status": "Shipment Picked Up",
-                         "location": "Warehouse",
-                         "instructions": "Package picked up from seller",
-                         "status_code": "PU"
-                     },
-                     {
-                         "date": (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S"),
-                         "status": "In Transit",
-                         "location": "Jaipur Hub",
-                         "instructions": "Package arrived at facility",
-                         "status_code": "IT"
-                     }
-                 ],
-                 "note": "Mock tracking data - API token invalid or missing"
-             }
+            logger.error(f"Tracking error: {str(e)}")
+            
+            return {
+                "success": True,
+                "awb": awb,
+                "status": "In Transit",
+                "current_location": "Jaipur Hub",
+                "destination": "Govindgarh",
+                "expected_delivery": (datetime.now() + timedelta(days=2)).strftime("%Y-%m-%d"),
+                "cod_amount": 0,
+                "tracking_history": [
+                    {
+                        "date": (datetime.now() - timedelta(days=2)).strftime("%Y-%m-%d %H:%M:%S"),
+                        "status": "Shipment Picked Up",
+                        "location": "Warehouse",
+                        "instructions": "Package picked up from seller",
+                        "status_code": "PU"
+                    },
+                    {
+                        "date": (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S"),
+                        "status": "In Transit",
+                        "location": "Jaipur Hub",
+                        "instructions": "Package arrived at facility",
+                        "status_code": "IT"
+                    }
+                ],
+                "note": "Mock tracking data - API token invalid or missing"
+            }
 
-    def create_return_shipment(self, return_data):
-        """
-        Create a return shipment
-        """
+    def create_return_shipment(self, return_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a return shipment"""
         try:
-            # For returns, we typically reverse the pickup and delivery addresses
-            # Use the same CMU create endpoint which is more reliable
             url = f"{self.BASE_URL}/api/cmu/create.json"
             
             payload = {
@@ -422,7 +387,7 @@ class DelhiveryService:
                         "phone": return_data["customer_phone"],
                         "order": f"RET-{return_data['original_order_id']}",
                         "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        "payment_mode": "Prepaid",  # Returns are usually prepaid
+                        "payment_mode": "Prepaid",
                         "cod_amount": 0,
                         "order_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                         "total_amount": return_data.get("return_amount", 0),
@@ -434,8 +399,6 @@ class DelhiveryService:
                     }
                 ]
             }
-            # Remove pickup_location as it expects a registered warehouse. 
-            # If omitted, it might default or we might need to specify destination separately.
             
             data_param = {"format": "json", "data": json.dumps(payload)}
             headers = self.headers.copy()
@@ -448,33 +411,31 @@ class DelhiveryService:
                 data = response.json()
              
                 if not data.get("packages") and data.get("error"):
-                     # API Validation Error
-                     logger.warning(f"Delhivery API Error: {data}")
-                     # Fallback to mock if API fails (e.g. for testing/invalid token)
-                     return {
+                    logger.warning(f"Delhivery API Error: {data}")
+                    return {
                         "success": True, 
                         "return_awb": f"RET_MOCK_{int(datetime.now().timestamp())}",
                         "label_url": "http://example.com/mock_label.pdf",
-                         "note": "Mock Return (API Failed)"
-                     }
+                        "note": "Mock Return (API Failed)"
+                    }
 
                 if data.get("packages") and len(data["packages"]) > 0:
                     pkg = data["packages"][0]
                     if pkg.get("status") == "Fail":
-                        logger.warning(f"Delhivery Return Failed (likely mock/test data): {pkg.get('remarks')}")
+                        logger.warning(f"Delhivery Return Failed: {pkg.get('remarks')}")
                         return {
                             "success": True, 
                             "return_awb": f"RET_MOCK_{int(datetime.now().timestamp())}",
                             "ref_id": f"REF_{int(datetime.now().timestamp())}",
                             "label_url": "http://example.com/mock_label.pdf",
-                             "note": f"Mock Return (API Failed: {pkg.get('remarks')})"
-                         }
+                            "note": f"Mock Return (API Failed: {pkg.get('remarks')})"
+                        }
                     
                     return {
                         "success": True,
                         "return_awb": pkg.get("waybill"),
                         "ref_id": pkg.get("refnum"), 
-                        "label_url": pkg.get("url") # Might need specific field check
+                        "label_url": pkg.get("url")
                     }
                     
             return {"success": False, "error": f"API Error {response.status_code}: {response.text}"}
@@ -483,18 +444,14 @@ class DelhiveryService:
             logger.error(f"Create return shipment error: {str(e)}")
             return {"success": False, "error": str(e)}
 
-    def get_label(self, awb):
-        """
-        Fetch shipping label for printing.
-        API: /api/p/packing_slip
-        """
+    def get_label(self, awb: str) -> Dict[str, Any]:
+        """Fetch shipping label for printing"""
         try:
             url = f"{self.BASE_URL}/api/p/packing_slip"
             params = {"wbns": awb, "pdf": "true"} 
             response = requests.get(url, headers=self.headers, params=params)
             
             if response.status_code == 200:
-                # Returns JSON with 'packages' list containing 'pdf_download_link'
                 data = response.json()
                 if data.get("packages") and len(data["packages"]) > 0:
                     return {
@@ -504,20 +461,17 @@ class DelhiveryService:
                     }
             return {"success": False, "error": "Label not found"}
         except Exception as e:
-             logger.error(f"Label generation error: {str(e)}")
-             
-             # Return mock label URL for testing
-             return {
-                 "success": True,
-                 "label_url": "https://via.placeholder.com/400x600/000000/FFFFFF?text=MOCK+SHIPPING+LABEL",
-                 "awb": awb,
-                 "note": "Mock label - API may be unavailable"
-             }
+            logger.error(f"Label generation error: {str(e)}")
+            
+            return {
+                "success": True,
+                "label_url": "https://via.placeholder.com/400x600/000000/FFFFFF?text=MOCK+SHIPPING+LABEL",
+                "awb": awb,
+                "note": "Mock label - API may be unavailable"
+            }
 
-    def get_invoice(self, awb):
-        """
-        Get invoice/manifest for the shipment
-        """
+    def get_invoice(self, awb: str) -> Dict[str, Any]:
+        """Get invoice/manifest for the shipment"""
         try:
             url = f"{self.BASE_URL}/api/p/packing_slip"
             params = {"wbns": awb, "pdf": "true", "invoice": "true"}
@@ -535,10 +489,8 @@ class DelhiveryService:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    def cancel_shipment(self, awb):
-        """
-        Cancel a shipment before pickup
-        """
+    def cancel_shipment(self, awb: str) -> Dict[str, Any]:
+        """Cancel a shipment before pickup"""
         try:
             url = f"{self.BASE_URL}/api/p/edit"
             payload = {
@@ -549,7 +501,6 @@ class DelhiveryService:
             response = requests.post(url, headers=self.headers, json=payload)
             
             if response.status_code == 200:
-                data = response.json()
                 return {
                     "success": True,
                     "message": "Shipment cancelled successfully",
