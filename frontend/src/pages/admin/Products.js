@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Textarea } from '../../components/ui/textarea';
 import { Switch } from '../../components/ui/switch';
 import { MultipleImageUpload } from '../../components/ui/image-upload';
-import { productsAPI, categoriesAPI } from '../../lib/api';
+import { productsAPI, categoriesAPI, settingsAPI } from '../../lib/api';
 import { getImageUrl } from '../../lib/utils';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Search, Package, Eye, Upload, Download, FileSpreadsheet, Barcode } from 'lucide-react';
@@ -20,6 +20,7 @@ import JsBarcode from 'jsbarcode';
 export default function AdminProducts() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showDialog, setShowDialog] = useState(false);
@@ -63,8 +64,16 @@ export default function AdminProducts() {
         toast.error('Failed to load categories');
       }
 
-      // Then fetch products
-      const productsRes = await productsAPI.getAll({ limit: 100 });
+      // Fetch settings
+      try {
+        const settingsRes = await settingsAPI.get();
+        setSettings(settingsRes.data);
+      } catch (settingsError) {
+        console.error('Failed to fetch settings:', settingsError);
+      }
+
+      // Then fetch products with include_inactive=true for admin panel
+      const productsRes = await productsAPI.getAll({ limit: 100, include_inactive: true });
       setProducts(productsRes.data.products || []);
     } catch (error) {
       console.error('Failed to fetch products:', error);
@@ -398,6 +407,282 @@ export default function AdminProducts() {
     }
   };
 
+  const [selectedProducts, setSelectedProducts] = useState(new Set());
+
+  const toggleProductSelection = (productId) => {
+    const newSelected = new Set(selectedProducts);
+    if (newSelected.has(productId)) {
+      newSelected.delete(productId);
+    } else {
+      newSelected.add(productId);
+    }
+    setSelectedProducts(newSelected);
+  };
+
+  const toggleAllSelection = () => {
+    if (selectedProducts.size === filteredProducts.length) {
+      setSelectedProducts(new Set());
+    } else {
+      setSelectedProducts(new Set(filteredProducts.map(p => p.id)));
+    }
+  };
+
+  const handleToggleStatus = async (productId, currentStatus) => {
+    try {
+      // Optimistically update UI
+      setProducts(products.map(p =>
+        p.id === productId ? { ...p, is_active: currentStatus } : p
+      ));
+
+      await productsAPI.update(productId, { is_active: currentStatus });
+      toast.success(`Product ${currentStatus ? 'activated' : 'deactivated'}`);
+    } catch (error) {
+      // Revert on failure
+      setProducts(products.map(p =>
+        p.id === productId ? { ...p, is_active: !currentStatus } : p
+      ));
+      toast.error('Failed to update status');
+    }
+  };
+
+  const generateCatalog = async () => {
+    if (selectedProducts.size === 0) {
+      toast.error('Please select products to generate catalog');
+      return;
+    }
+
+    const { jsPDF } = await import('jspdf');
+    const doc = new jsPDF();
+
+    // Config
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 2;
+
+    // --- Cover Page ---
+    // Helper to get image data URI
+    const getDataUri = async (url) => {
+      try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      } catch (error) {
+        console.error('Failed to load image for PDF:', error);
+        return null;
+      }
+    };
+
+    // --- Cover Page ---
+    // Title
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(40);
+    const companyName = settings?.business_name || settings?.company_name || "Amorlias Mart";
+    doc.text(companyName, pageWidth / 2, 60, { align: "center" });
+
+    // Logo
+    if (settings?.logo_url) {
+      try {
+        const logoUrl = getImageUrl(settings.logo_url);
+        const logoDataUri = await getDataUri(logoUrl);
+
+        if (logoDataUri) {
+          // Draw logo centered
+          // Detect format from Data URI
+          let format = 'PNG';
+          if (logoDataUri.startsWith('data:image/jpeg')) format = 'JPEG';
+          else if (logoDataUri.startsWith('data:image/png')) format = 'PNG';
+          else if (logoDataUri.startsWith('data:image/webp')) format = 'WEBP';
+
+          doc.addImage(logoDataUri, format, (pageWidth / 2) - 30, 80, 60, 60, undefined, 'FAST');
+        } else {
+          throw new Error("Could not load logo data URI");
+        }
+      } catch (e) {
+        // Fallback to circle if image fails
+        doc.setDrawColor(0, 150, 255);
+        doc.setLineWidth(2);
+        doc.circle(pageWidth / 2, 110, 25, 'S');
+      }
+    } else {
+      // Fallback circle
+      doc.setDrawColor(0, 150, 255);
+      doc.setLineWidth(2);
+      doc.circle(pageWidth / 2, 110, 25, 'S');
+    }
+
+    doc.setFontSize(16);
+    doc.text(companyName, pageWidth / 2, 150, { align: "center" });
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text("wholesale", pageWidth / 2, 155, { align: "center" });
+
+    // Contact Info Box
+    doc.setDrawColor(200);
+    doc.rect(margin + 20, 180, pageWidth - (margin * 2) - 40, 40);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+
+    // Dynamic Description/Tagline
+    const descLine1 = `Wholesaler of Home And Kitchen & Home`;
+    const descLine2 = `Products by ${companyName}, ${settings?.address?.city || 'Surat'}`;
+
+    doc.text(descLine1, pageWidth / 2, 190, { align: "center" });
+    doc.text(descLine2, pageWidth / 2, 196, { align: "center" });
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+
+    // Address components for description
+    const city = settings?.address?.city || 'Surat';
+    const state = settings?.address?.state || 'Gujarat';
+
+    doc.text("Wholesaler of Home And Kitchen, Home Products &", pageWidth / 2, 204, { align: "center" });
+    doc.text(`Household Products from ${city}, ${state}, India`, pageWidth / 2, 209, { align: "center" });
+
+    // Footer Contact
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    const phone = settings?.phone || settings?.whatsapp_number || "";
+    if (phone) {
+      doc.text(`MOBILE - ${phone}`, pageWidth / 2, 240, { align: "center" });
+    }
+
+    // Address
+    doc.setFontSize(14);
+    if (settings?.address) {
+      let yPos = 255;
+      const { line1, line2, city, state, pincode } = settings.address;
+
+      const addressLines = [
+        line1,
+        line2,
+        city && state ? `${city}, ${state}` : city || state,
+        pincode ? `, ${pincode}` : ''
+      ].filter(Boolean);
+
+      addressLines.forEach(line => {
+        doc.text(line.toUpperCase(), pageWidth / 2, yPos, { align: "center" });
+        yPos += 7;
+      });
+    } else {
+      doc.text("DOM NO 7, OPP. SUMAN", pageWidth / 2, 255, { align: "center" });
+      doc.text("PRATIK AWAS , NEAR BY", pageWidth / 2, 262, { align: "center" });
+      doc.text("RIDDHI GRANITE", pageWidth / 2, 269, { align: "center" });
+      doc.text("VRINDAVAN FARM ,", pageWidth / 2, 276, { align: "center" });
+      doc.text("HARIDARSHAN NO KHADO", pageWidth / 2, 283, { align: "center" });
+      doc.text(", KATARGAM - 395004", pageWidth / 2, 290, { align: "center" });
+    }
+
+    // --- Product Pages ---
+    doc.addPage();
+
+    const items = products.filter(p => selectedProducts.has(p.id));
+    const colCount = 4;
+    const itemWidth = (pageWidth - (margin * 2)) / colCount;
+    const itemHeight = 68; // Height per product cell - Optimized to fit 4 rows comfortably
+
+    let x = margin;
+    let y = margin;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+
+      // Check if we need a new page
+      if (y + itemHeight > pageHeight - margin) {
+        doc.addPage();
+        y = margin;
+        x = margin;
+      }
+
+      // Product Container
+      // doc.rect(x, y, itemWidth, itemHeight); // Optional border
+
+      // Image
+      if (item.images && item.images.length > 0) {
+        try {
+          const imgUrl = getImageUrl(item.images[0]);
+          // Draw image (Adjusted size for smaller cell)
+          doc.addImage(imgUrl, 'JPEG', x + 5, y + 2, itemWidth - 10, itemWidth - 10, undefined, 'FAST');
+        } catch (e) {
+          // Fallback placeholder
+          doc.setFillColor(240);
+          doc.rect(x + 5, y + 2, itemWidth - 10, itemWidth - 10, 'F');
+        }
+      } else {
+        doc.setFillColor(240);
+        doc.rect(x + 5, y + 2, itemWidth - 10, itemWidth - 10, 'F');
+      }
+
+      // Text Content
+      const textY = y + itemWidth - 5; // Start text after image square - Shifted up
+
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+
+      // Name (Wrap text)
+      const nameLines = doc.splitTextToSize(item.name, itemWidth - 4);
+      doc.text(nameLines, x + itemWidth / 2, textY + 5, { align: "center" });
+
+      // SKU
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.text(item.sku, x + itemWidth / 2, textY + 15, { align: "center" });
+
+      // Price
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(200, 0, 200); // Magenta/Purple color
+      // Showing Wholesale Price as per request logic, fallback to Selling Price
+      const price = item.wholesale_price || item.selling_price;
+      doc.text(`${price}/-`, x + itemWidth / 2, textY + 20, { align: "center" });
+
+      doc.setTextColor(0); // Reset color
+
+      // Move to next cell
+      x += itemWidth;
+
+      // Check if row is full
+      if ((i + 1) % colCount === 0) {
+        x = margin;
+        y += itemHeight;
+      }
+    }
+
+    // --- Policy Page ---
+    try {
+      // Get the current URL to construct absolute path for public folder image
+      const origin = window.location.origin;
+      const policyParams = await getDataUri(`${origin}/exchange_policy.png`);
+
+      if (policyParams) {
+        doc.addPage();
+        const imgWidth = pageWidth - (margin * 2);
+        const imgHeight = (imgWidth * 3) / 4; // Assume 4:3 aspect ratio, or fit to page
+
+        // Center vertically on the page
+        const yPos = (pageHeight - imgHeight) / 2;
+
+        doc.addImage(policyParams, 'PNG', margin, yPos, imgWidth, imgHeight, undefined, 'FAST');
+
+        // Optional: Title for the policy page
+        // doc.setFontSize(20);
+        // doc.text("Exchange Policy", pageWidth / 2, margin + 20, { align: "center" });
+      }
+    } catch (error) {
+      console.error("Failed to add policy image", error);
+    }
+
+    // Use company name for filename
+    const filename = `${(settings?.business_name || "catalog").replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`;
+    doc.save(filename);
+    toast.success("Catalog downloaded");
+  };
+
   const filteredProducts = products.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
     p.sku.toLowerCase().includes(search.toLowerCase())
@@ -408,9 +693,18 @@ export default function AdminProducts() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Products</h1>
-          <p className="text-slate-400">{products.length} products</p>
+          <p className="text-slate-400">
+            {products.length} products
+            {selectedProducts.size > 0 && ` • ${selectedProducts.size} selected`}
+          </p>
         </div>
         <div className="flex gap-2">
+          {selectedProducts.size > 0 && (
+            <Button variant="secondary" onClick={generateCatalog} className="bg-purple-600 hover:bg-purple-700 text-white border-none">
+              <Download className="w-4 h-4 mr-2" />
+              Download Catalog ({selectedProducts.size})
+            </Button>
+          )}
           <Dialog open={showBulkDialog} onOpenChange={setShowBulkDialog}>
             <DialogTrigger asChild>
               <Button variant="outline" className="btn-admin">
@@ -795,6 +1089,14 @@ export default function AdminProducts() {
           <Table>
             <TableHeader>
               <TableRow className="border-slate-700 hover:bg-transparent">
+                <TableHead className="w-12">
+                  <input
+                    type="checkbox"
+                    checked={filteredProducts.length > 0 && selectedProducts.size === filteredProducts.length}
+                    onChange={toggleAllSelection}
+                    className="rounded border-slate-600 bg-slate-700 text-primary focus:ring-primary h-4 w-4"
+                  />
+                </TableHead>
                 <TableHead className="text-slate-400">Product</TableHead>
                 <TableHead className="text-slate-400">SKU</TableHead>
                 <TableHead className="text-slate-400">Price</TableHead>
@@ -819,6 +1121,14 @@ export default function AdminProducts() {
                 filteredProducts.map((product) => (
                   <TableRow key={product.id} className="border-slate-700">
                     <TableCell>
+                      <input
+                        type="checkbox"
+                        checked={selectedProducts.has(product.id)}
+                        onChange={() => toggleProductSelection(product.id)}
+                        className="rounded border-slate-600 bg-slate-700 text-primary focus:ring-primary h-4 w-4"
+                      />
+                    </TableCell>
+                    <TableCell>
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-slate-700 rounded-lg overflow-hidden">
                           {product.images?.[0] && (
@@ -841,9 +1151,16 @@ export default function AdminProducts() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge className={product.is_active ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-500/20 text-slate-400'}>
-                        {product.is_active ? 'Active' : 'Inactive'}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={product.is_active}
+                          onCheckedChange={(checked) => handleToggleStatus(product.id, checked)}
+                          className="data-[state=checked]:bg-green-500"
+                        />
+                        <span className={`text-xs ${product.is_active ? 'text-green-400' : 'text-slate-500'}`}>
+                          {product.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">

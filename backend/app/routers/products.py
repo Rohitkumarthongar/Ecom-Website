@@ -21,10 +21,15 @@ def get_products(
     sort_order: str = "desc",
     page: int = 1,
     limit: int = 20,
+    include_inactive: bool = False,
     db: Session = Depends(get_db)
 ):
     """Get products with filtering and pagination"""
-    query = db.query(models.Product).filter(models.Product.is_active == True)
+    query = db.query(models.Product)
+    
+    # Only filter by is_active if include_inactive is False (for public API)
+    if not include_inactive:
+        query = query.filter(models.Product.is_active == True)
     
     if category_id:
         query = query.filter(models.Product.category_id == category_id)

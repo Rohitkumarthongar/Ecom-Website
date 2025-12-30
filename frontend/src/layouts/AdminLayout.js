@@ -161,7 +161,6 @@ export default function AdminLayout({ children }) {
                   </div>
                 )}
                 <div>
-                  <span className="font-bold block">{settings?.business_name || 'Amorlias'}</span>
                   <span className="text-xs text-slate-400">Admin Panel</span>
                 </div>
               </Link>
@@ -255,7 +254,6 @@ export default function AdminLayout({ children }) {
                     </div>
                   )}
                   <div>
-                    <span className="font-bold block">{settings?.business_name || 'Amorlias'}</span>
                     <span className="text-xs text-slate-400">Admin Panel</span>
                   </div>
                 </Link>

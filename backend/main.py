@@ -4,13 +4,15 @@ FastAPI Main Application Entry Point
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import Depends, HTTPException
+from sqlalchemy.orm import Session
 from pathlib import Path
 import logging
 
 from app.core.config import settings
-from app.core.database import engine
+from app.core.database import engine, get_db
 from app import models
-from app.routers import auth, users, products, categories, orders, admin, uploads, notifications, banners, offers, utils, settings as settings_router
+from app.routers import auth, users, products, categories, orders, admin, uploads, notifications, banners, offers, utils, settings as settings_router, courier, pages, returns
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -55,6 +57,49 @@ def create_application() -> FastAPI:
     app.include_router(offers.router, prefix=f"{settings.API_V1_STR}/offers", tags=["offers"])
     app.include_router(utils.router, prefix=f"{settings.API_V1_STR}/utils", tags=["utilities"])
     app.include_router(settings_router.router, prefix=f"{settings.API_V1_STR}/admin/settings", tags=["settings"])
+    app.include_router(courier.router, prefix=f"{settings.API_V1_STR}/courier", tags=["courier"])
+    app.include_router(pages.router, prefix=f"{settings.API_V1_STR}/pages", tags=["pages"])
+    app.include_router(returns.router, prefix=f"{settings.API_V1_STR}/returns", tags=["returns"])
+    
+    # Public settings endpoint (no /admin prefix)
+    from app.routers.settings import get_public_settings
+    app.add_api_route(f"{settings.API_V1_STR}/settings/public", get_public_settings, methods=["GET"], tags=["public"])
+    
+    # Pincode verification endpoint (direct route)
+    from app.routers.utils import verify_pincode
+    app.add_api_route(f"{settings.API_V1_STR}/verify-pincode", verify_pincode, methods=["POST"], tags=["utilities"])
+    
+    # Contact form endpoint (direct route)
+    from app.routers.pages import submit_contact_form
+    app.add_api_route(f"{settings.API_V1_STR}/contact", submit_contact_form, methods=["POST"], tags=["contact"])
+    
+    # Product lookup endpoints
+    @app.get(f"{settings.API_V1_STR}/products/lookup", tags=["products"])
+    def product_lookup(sku: str = None, barcode: str = None, db: Session = Depends(get_db)):
+        """Lookup product by SKU or barcode"""
+        if sku:
+            product = db.query(models.Product).filter(models.Product.sku == sku).first()
+        elif barcode:
+            product = db.query(models.Product).filter(models.Product.barcode == barcode).first()
+        else:
+            raise HTTPException(status_code=400, detail="SKU or barcode required")
+        
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found")
+        
+        return product
+    
+    # Payment QR generation
+    @app.post(f"{settings.API_V1_STR}/generate-qr", tags=["payments"])
+    def generate_payment_qr(data: dict):
+        """Generate payment QR code"""
+        # TODO: Implement QR code generation
+        return {
+            "qr_code": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+            "amount": data.get("amount", 0),
+            "customer_name": data.get("customer_name", "Customer"),
+            "order_number": data.get("order_number", "")
+        }
 
     # Create database tables
     models.Base.metadata.create_all(bind=engine)
