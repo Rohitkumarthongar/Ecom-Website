@@ -10,7 +10,7 @@ import logging
 from app.core.config import settings
 from app.core.database import engine
 from app import models
-from app.routers import auth, users, products, categories, orders, admin, uploads, notifications, banners, offers, utils
+from app.routers import auth, users, products, categories, orders, admin, uploads, notifications, banners, offers, utils, settings as settings_router
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -54,6 +54,7 @@ def create_application() -> FastAPI:
     app.include_router(banners.router, prefix=f"{settings.API_V1_STR}/banners", tags=["banners"])
     app.include_router(offers.router, prefix=f"{settings.API_V1_STR}/offers", tags=["offers"])
     app.include_router(utils.router, prefix=f"{settings.API_V1_STR}/utils", tags=["utilities"])
+    app.include_router(settings_router.router, prefix=f"{settings.API_V1_STR}/admin/settings", tags=["settings"])
 
     # Create database tables
     models.Base.metadata.create_all(bind=engine)

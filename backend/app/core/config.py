@@ -36,6 +36,21 @@ class Settings(BaseSettings):
     SMTP_PORT: int = 587
     SMTP_USER: Optional[str] = None
     SMTP_PASSWORD: Optional[str] = None
+    EMAIL_FROM_NAME: str = "BharatBazaar"
+    
+    # SMS/OTP Settings
+    SMS_ENABLED: bool = False
+    SMS_PROVIDER: str = "twilio"  # twilio, msg91, or console
+    
+    # Twilio Settings (for SMS OTP)
+    TWILIO_ACCOUNT_SID: Optional[str] = None
+    TWILIO_AUTH_TOKEN: Optional[str] = None
+    TWILIO_PHONE_NUMBER: Optional[str] = None
+    
+    # MSG91 Settings (Alternative SMS provider for India)
+    MSG91_AUTH_KEY: Optional[str] = None
+    MSG91_SENDER_ID: Optional[str] = None
+    MSG91_TEMPLATE_ID: Optional[str] = None
     
     # Courier Settings
     DELHIVERY_TOKEN: Optional[str] = None

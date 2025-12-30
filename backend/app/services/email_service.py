@@ -17,14 +17,38 @@ class EmailService:
     
     @staticmethod
     def get_email_config():
-        """Get email configuration from settings"""
+        """Get email configuration from database or settings"""
+        from app.core.database import SessionLocal
+        from app import models
+        
+        # Try to get configuration from database first
+        try:
+            db = SessionLocal()
+            db_settings = db.query(models.Settings).filter(models.Settings.type == "business").first()
+            if db_settings and db_settings.smtp_user:
+                config = {
+                    "SMTP_HOST": db_settings.smtp_host or settings.SMTP_HOST or 'smtp.gmail.com',
+                    "SMTP_PORT": db_settings.smtp_port or settings.SMTP_PORT or 587,
+                    "SMTP_USERNAME": db_settings.smtp_user or settings.SMTP_USER or '',
+                    "SMTP_PASSWORD": db_settings.smtp_password or settings.SMTP_PASSWORD or '',
+                    "SMTP_FROM_EMAIL": db_settings.smtp_user or settings.SMTP_USER or 'support@bharatbazaar.com',
+                    "SMTP_FROM_NAME": settings.EMAIL_FROM_NAME or 'BharatBazaar',
+                    "EMAIL_ENABLED": db_settings.email_enabled == "true" if db_settings.email_enabled else settings.EMAIL_ENABLED
+                }
+                db.close()
+                return config
+            db.close()
+        except Exception as e:
+            logger.warning(f"Could not load email config from database: {e}")
+        
+        # Fall back to environment configuration
         return {
             "SMTP_HOST": settings.SMTP_HOST or 'smtp.gmail.com',
             "SMTP_PORT": settings.SMTP_PORT or 587,
             "SMTP_USERNAME": settings.SMTP_USER or 'support@bharatbazaar.com',
             "SMTP_PASSWORD": settings.SMTP_PASSWORD or '',
             "SMTP_FROM_EMAIL": settings.SMTP_USER or 'support@bharatbazaar.com',
-            "SMTP_FROM_NAME": 'BharatBazaar',
+            "SMTP_FROM_NAME": settings.EMAIL_FROM_NAME or 'BharatBazaar',
             "EMAIL_ENABLED": settings.EMAIL_ENABLED
         }
 
