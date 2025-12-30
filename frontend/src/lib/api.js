@@ -145,6 +145,9 @@ export const settingsAPI = {
   getPublic: () => api.get('/settings/public'),
   getEmailSettings: () => api.get('/admin/settings/email'),
   testEmail: (data) => api.post('/admin/settings/email/test', data),
+  getSmsSettings: () => api.get('/admin/settings/sms'),
+  updateSmsSettings: (data) => api.put('/admin/settings/sms', data),
+  updateEmailSettings: (data) => api.put('/admin/settings/email', data),
 };
 
 // Reports API

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from datetime import datetime, timezone, timedelta
+import logging
 
 from app.core.database import get_db
 from app.core.security import hash_password, verify_password, create_access_token, get_current_user
@@ -12,13 +13,16 @@ from app.core.utils import generate_otp, generate_id
 from app.schemas.auth import OTPRequest, OTPVerify, ForgotPasswordRequest, Token
 from app.schemas.user import UserCreate, UserLogin, UserResponse
 from app.services.email_service import EmailService
+from app.services.sms_service import SMSService
 from app import models
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 @router.post("/send-otp")
 def send_otp(data: OTPRequest, db: Session = Depends(get_db)):
-    """Send OTP to phone/email"""
+    """Send OTP via SMS with Email fallback"""
     otp = generate_otp()
     expiry = datetime.now(timezone.utc) + timedelta(minutes=10)
     
@@ -34,11 +38,29 @@ def send_otp(data: OTPRequest, db: Session = Depends(get_db)):
     
     db.commit()
     
-    # Send OTP via Email
-    if data.email:
-        EmailService.send_otp_email(data.email, data.phone, otp)
+    # Try SMS first
+    sms_sent = SMSService.send_otp_sms(data.phone, otp)
     
-    return {"message": "OTP sent successfully", "otp_for_testing": otp}
+    # If SMS failed and email is provided, try email as fallback
+    email_sent = False
+    if not sms_sent and data.email:
+        logger.info(f"SMS failed for {data.phone}, attempting email fallback to {data.email}")
+        email_sent = EmailService.send_otp_email(data.email, data.phone, otp)
+    elif data.email:
+        # SMS succeeded, but also send email if provided (dual channel)
+        email_sent = EmailService.send_otp_email(data.email, data.phone, otp)
+    
+    # Determine response message
+    if sms_sent and email_sent:
+        message = "OTP sent successfully via SMS and email"
+    elif sms_sent:
+        message = "OTP sent successfully via SMS"
+    elif email_sent:
+        message = "OTP sent successfully via email (SMS unavailable)"
+    else:
+        message = "OTP generated (check console logs or contact support)"
+    
+    return {"message": message, "otp_for_testing": otp}
 
 @router.post("/verify-otp")
 def verify_otp(data: OTPVerify, db: Session = Depends(get_db)):
