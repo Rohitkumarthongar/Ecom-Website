@@ -39,3 +39,8 @@ INFO:     192.168.31.18:42186 - "GET /api/admin/reports/inventory-status HTTP/1.
 INFO:     192.168.31.18:48400 - "GET /api/admin/notifications/unread-count HTTP/1.1" 200 OK
 INFO:     192.168.31.18:52320 - "GET /api/admin/notifications/unread-count HTTP/1.1" 200 OK
 INFO:     192.168.31.18:55104 - "GET /api/admin/notifications/unread-count HTTP/1.1" 200 OK
+INFO:     192.168.31.18:42710 - "GET /api/admin/notifications/unread-count HTTP/1.1" 200 OK
+INFO:     192.168.31.18:36944 - "GET /api/admin/notifications/unread-count HTTP/1.1" 200 OK
+INFO:     192.168.31.18:41190 - "GET /api/admin/notifications/unread-count HTTP/1.1" 200 OK
+INFO:     192.168.31.18:36764 - "GET /api/admin/notifications/unread-count HTTP/1.1" 200 OK
+INFO:     192.168.31.18:55802 - "GET /api/admin/notifications/unread-count HTTP/1.1" 200 OK
