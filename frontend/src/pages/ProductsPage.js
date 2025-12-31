@@ -27,7 +27,7 @@ const ProductCard = ({ product, view }) => {
 
   if (view === 'list') {
     return (
-      <Card 
+      <Card
         className="flex gap-4 p-4 hover:shadow-lg transition-shadow cursor-pointer"
         onClick={() => navigate(`/products/${product.id}`)}
         data-testid={`product-card-${product.id}`}
@@ -52,7 +52,7 @@ const ProductCard = ({ product, view }) => {
             {discount > 0 && <Badge className="discount-badge">{discount}% OFF</Badge>}
           </div>
         </div>
-        <Button 
+        <Button
           className="self-center btn-primary"
           onClick={(e) => { e.stopPropagation(); addItem(product); }}
         >
@@ -63,7 +63,7 @@ const ProductCard = ({ product, view }) => {
   }
 
   return (
-    <Card 
+    <Card
       className="card-product group cursor-pointer"
       onClick={() => navigate(`/products/${product.id}`)}
       data-testid={`product-card-${product.id}`}
@@ -100,7 +100,7 @@ const ProductCard = ({ product, view }) => {
           </span>
           <span className="text-sm text-muted-foreground line-through">₹{product.mrp.toLocaleString()}</span>
         </div>
-        <Button 
+        <Button
           className="w-full mt-3 btn-primary opacity-0 group-hover:opacity-100 transition-opacity"
           onClick={(e) => { e.stopPropagation(); addItem(product); }}
         >
@@ -152,7 +152,7 @@ export default function ProductsPage() {
       });
       setProducts(response.data.products || []);
       setTotalPages(response.data.pages || 1);
-      
+
       // Update max price based on available products
       if (response.data.products && response.data.products.length > 0) {
         const prices = response.data.products.map(p => p.selling_price);
@@ -168,10 +168,10 @@ export default function ProductsPage() {
 
   const fetchCategories = async () => {
     try {
-      const response = await categoriesAPI.getAll();
+      const response = await categoriesAPI.getFlat();
       setCategories(response.data || []);
     } catch (error) {
-      console.error('Failed to fetch categories:', error);
+      // Failed to fetch categories
     }
   };
 
@@ -207,139 +207,221 @@ export default function ProductsPage() {
     return count;
   };
 
-  const FilterSidebar = () => (
-    <div className="space-y-6">
-      {/* Active Filters */}
-      {activeFiltersCount() > 0 && (
+  // Helper to build category tree from flat list
+  const buildCategoryTree = (cats) => {
+    const tree = [];
+    const map = {};
+
+    // First pass: create nodes
+    cats.forEach(cat => {
+      map[cat.id] = { ...cat, children: [] };
+    });
+
+    // Second pass: link parents and children
+    cats.forEach(cat => {
+      if (cat.parent_id && map[cat.parent_id]) {
+        map[cat.parent_id].children.push(map[cat.id]);
+      } else {
+        tree.push(map[cat.id]);
+      }
+    });
+
+    return tree;
+  };
+
+  const CategoryTreeItem = ({ category, level = 0 }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+    // Expand if active category is this or a child
+    const isActive = categoryId === category.id;
+    const hasActiveChild = (cat) => {
+      if (cat.id === categoryId) return true;
+      return cat.children?.some(child => hasActiveChild(child));
+    };
+
+    useEffect(() => {
+      if (hasActiveChild(category)) {
+        setIsExpanded(true);
+      }
+    }, [categoryId]);
+
+    const hasChildren = category.children && category.children.length > 0;
+
+    return (
+      <div className="select-none">
+        <div
+          className={`flex items-center justify-between px-3 py-2 rounded-lg transition-colors cursor-pointer text-sm mb-1 ${isActive
+              ? 'bg-primary/10 text-primary font-medium'
+              : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+            }`}
+          style={{ paddingLeft: `${level * 12 + 12}px` }}
+          onClick={(e) => {
+            e.stopPropagation();
+            updateFilters('category', category.id);
+          }}
+        >
+          <span className="truncate">{category.name}</span>
+          {hasChildren && (
+            <div
+              className="p-1 hover:bg-background rounded-md transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsExpanded(!isExpanded);
+              }}
+            >
+              {isExpanded ? (
+                <ChevronRight className="w-3 h-3 transform rotate-90 transition-transform" />
+              ) : (
+                <ChevronRight className="w-3 h-3 transition-transform" />
+              )}
+            </div>
+          )}
+        </div>
+        {hasChildren && isExpanded && (
+          <div className="animate-in slide-in-from-top-1 duration-200">
+            {category.children.map(child => (
+              <CategoryTreeItem key={child.id} category={child} level={level + 1} />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const FilterSidebar = () => {
+    const categoryTree = buildCategoryTree(categories);
+
+    return (
+      <div className="space-y-6">
+        {/* Active Filters */}
+        {activeFiltersCount() > 0 && (
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-semibold text-sm">Active Filters ({activeFiltersCount()})</h4>
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 text-xs">
+                <X className="w-3 h-3 mr-1" />
+                Clear All
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {categoryId && (
+                <Badge variant="secondary" className="flex items-center gap-1 rounded-md px-2 py-1">
+                  {categories.find(c => c.id === categoryId)?.name}
+                  <X className="w-3 h-3 cursor-pointer hover:text-destructive" onClick={() => updateFilters('category', '')} />
+                </Badge>
+              )}
+              {search && (
+                <Badge variant="secondary" className="flex items-center gap-1 rounded-md px-2 py-1">
+                  "{search}"
+                  <X className="w-3 h-3 cursor-pointer hover:text-destructive" onClick={() => updateFilters('search', '')} />
+                </Badge>
+              )}
+              {(minPrice > 0 || maxPriceParam < maxPrice) && (
+                <Badge variant="secondary" className="flex items-center gap-1 rounded-md px-2 py-1">
+                  ₹{minPrice} - ₹{maxPriceParam}
+                  <X className="w-3 h-3 cursor-pointer hover:text-destructive" onClick={() => updatePriceRange([0, maxPrice])} />
+                </Badge>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Categories */}
+        <div className="pb-4 border-b">
+          <h4 className="font-semibold mb-3 text-sm">Categories</h4>
+          <div className="space-y-0.5">
+            <div
+              className={`cursor-pointer px-3 py-2 rounded-lg transition-colors text-sm mb-1 ${!categoryId
+                  ? 'bg-primary/10 text-primary font-medium'
+                  : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+                }`}
+              onClick={() => updateFilters('category', '')}
+            >
+              All Products
+            </div>
+            {categoryTree.map((cat) => (
+              <CategoryTreeItem key={cat.id} category={cat} />
+            ))}
+          </div>
+        </div>
+
+        {/* Price Range */}
+        <div className="pb-4 border-b">
+          <h4 className="font-semibold mb-3 text-sm">Price Range</h4>
+          <div className="space-y-4 px-1">
+            <div>
+              <Slider
+                value={priceRange}
+                onValueChange={setPriceRange}
+                onValueCommit={updatePriceRange}
+                max={maxPrice}
+                step={100}
+                className="w-full my-4"
+              />
+              <div className="flex items-center gap-4">
+                <div className="grid gap-1">
+                  <Label className="text-xs text-muted-foreground">Min</Label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">₹</span>
+                    <Input
+                      type="number"
+                      value={priceRange[0]}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value) || 0;
+                        setPriceRange([value, priceRange[1]]);
+                      }}
+                      onBlur={() => updatePriceRange(priceRange)}
+                      className="h-8 pl-5 text-xs"
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-1">
+                  <Label className="text-xs text-muted-foreground">Max</Label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">₹</span>
+                    <Input
+                      type="number"
+                      value={priceRange[1]}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value) || maxPrice;
+                        setPriceRange([priceRange[0], value]);
+                      }}
+                      onBlur={() => updatePriceRange(priceRange)}
+                      className="h-8 pl-5 text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Price Filters */}
         <div>
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="font-semibold">Active Filters ({activeFiltersCount()})</h4>
-            <Button variant="ghost" size="sm" onClick={clearFilters}>
-              <X className="w-4 h-4 mr-1" />
-              Clear All
-            </Button>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {categoryId && (
-              <Badge variant="secondary" className="flex items-center gap-1">
-                {categories.find(c => c.id === categoryId)?.name}
-                <X className="w-3 h-3 cursor-pointer" onClick={() => updateFilters('category', '')} />
-              </Badge>
-            )}
-            {search && (
-              <Badge variant="secondary" className="flex items-center gap-1">
-                "{search}"
-                <X className="w-3 h-3 cursor-pointer" onClick={() => updateFilters('search', '')} />
-              </Badge>
-            )}
-            {(minPrice > 0 || maxPriceParam < maxPrice) && (
-              <Badge variant="secondary" className="flex items-center gap-1">
-                ₹{minPrice} - ₹{maxPriceParam}
-                <X className="w-3 h-3 cursor-pointer" onClick={() => updatePriceRange([0, maxPrice])} />
-              </Badge>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Categories */}
-      <div>
-        <h4 className="font-semibold mb-3">Categories</h4>
-        <div className="space-y-2">
-          <div 
-            className={`cursor-pointer px-3 py-2 rounded-lg transition-colors ${!categoryId ? 'bg-primary text-white' : 'hover:bg-muted'}`}
-            onClick={() => updateFilters('category', '')}
-          >
-            All Categories
-          </div>
-          {categories.map((cat) => (
-            <div
-              key={cat.id}
-              className={`cursor-pointer px-3 py-2 rounded-lg transition-colors ${categoryId === cat.id ? 'bg-primary text-white' : 'hover:bg-muted'}`}
-              onClick={() => updateFilters('category', cat.id)}
-            >
-              {cat.name}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Price Range */}
-      <div>
-        <h4 className="font-semibold mb-3">Price Range</h4>
-        <div className="space-y-4">
-          <div className="px-3">
-            <Slider
-              value={priceRange}
-              onValueChange={setPriceRange}
-              onValueCommit={updatePriceRange}
-              max={maxPrice}
-              step={100}
-              className="w-full"
-            />
-            <div className="flex justify-between text-sm text-muted-foreground mt-2">
-              <span>₹{priceRange[0]}</span>
-              <span>₹{priceRange[1]}</span>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <Label className="text-xs">Min Price</Label>
-              <Input
-                type="number"
-                value={priceRange[0]}
-                onChange={(e) => {
-                  const value = parseInt(e.target.value) || 0;
-                  setPriceRange([value, priceRange[1]]);
-                }}
-                onBlur={() => updatePriceRange(priceRange)}
-                className="h-8"
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Max Price</Label>
-              <Input
-                type="number"
-                value={priceRange[1]}
-                onChange={(e) => {
-                  const value = parseInt(e.target.value) || maxPrice;
-                  setPriceRange([priceRange[0], value]);
-                }}
-                onBlur={() => updatePriceRange(priceRange)}
-                className="h-8"
-              />
-            </div>
+          <h4 className="font-semibold mb-3 text-sm">Quick Filters</h4>
+          <div className="space-y-1">
+            {[
+              { label: 'Under ₹500', min: 0, max: 500 },
+              { label: '₹500 - ₹1,000', min: 500, max: 1000 },
+              { label: '₹1,000 - ₹5,000', min: 1000, max: 5000 },
+              { label: '₹5,000 - ₹10,000', min: 5000, max: 10000 },
+              { label: 'Above ₹10,000', min: 10000, max: maxPrice },
+            ].map((range) => (
+              <div
+                key={range.label}
+                className={`cursor-pointer px-3 py-1.5 rounded-md transition-colors text-sm ${minPrice === range.min && maxPriceParam === range.max
+                    ? 'bg-primary/10 text-primary font-medium'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  }`}
+                onClick={() => updatePriceRange([range.min, range.max])}
+              >
+                {range.label}
+              </div>
+            ))}
           </div>
         </div>
       </div>
-
-      {/* Quick Price Filters */}
-      <div>
-        <h4 className="font-semibold mb-3">Quick Price Filters</h4>
-        <div className="space-y-2">
-          {[
-            { label: 'Under ₹500', min: 0, max: 500 },
-            { label: '₹500 - ₹1,000', min: 500, max: 1000 },
-            { label: '₹1,000 - ₹5,000', min: 1000, max: 5000 },
-            { label: '₹5,000 - ₹10,000', min: 5000, max: 10000 },
-            { label: 'Above ₹10,000', min: 10000, max: maxPrice },
-          ].map((range) => (
-            <div
-              key={range.label}
-              className={`cursor-pointer px-3 py-2 rounded-lg transition-colors text-sm ${
-                minPrice === range.min && maxPriceParam === range.max
-                  ? 'bg-primary text-white'
-                  : 'hover:bg-muted'
-              }`}
-              onClick={() => updatePriceRange([range.min, range.max])}
-            >
-              {range.label}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8" data-testid="products-page">

@@ -84,7 +84,7 @@ export default function HomePage() {
     try {
       const [productsRes, categoriesRes, bannersRes, offersRes] = await Promise.all([
         productsAPI.getAll({ limit: 12 }),
-        categoriesAPI.getAll(),
+        categoriesAPI.getTree(),
         bannersAPI.getAll(),
         offersAPI.getAll(),
       ]);

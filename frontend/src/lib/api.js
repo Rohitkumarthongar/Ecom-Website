@@ -56,10 +56,14 @@ export const productsAPI = {
 // Categories API
 export const categoriesAPI = {
   getAll: () => api.get('/categories'),
+  getTree: () => api.get('/categories/tree'),
+  getFlat: () => api.get('/categories/flat'),
   getOne: (id) => api.get(`/categories/${id}`),
+  getChildren: (id, recursive = false) => api.get(`/categories/${id}/children?recursive=${recursive}`),
+  getPath: (id) => api.get(`/categories/${id}/path`),
   create: (data) => api.post('/admin/categories', data),
   update: (id, data) => api.put(`/admin/categories/${id}`, data),
-  delete: (id) => api.delete(`/admin/categories/${id}`, data),
+  delete: (id, force = false) => api.delete(`/admin/categories/${id}?force=${force}`),
 };
 
 // Inventory API

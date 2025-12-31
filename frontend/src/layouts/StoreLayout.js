@@ -43,10 +43,10 @@ export const StoreHeader = () => {
 
   const fetchCategories = async () => {
     try {
-      const response = await categoriesAPI.getAll();
+      const response = await categoriesAPI.getTree();
       setCategories(response.data || []);
     } catch (error) {
-      console.error('Failed to fetch categories:', error);
+      // Failed to fetch categories
     }
   };
 
