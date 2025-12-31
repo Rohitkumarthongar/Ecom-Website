@@ -275,7 +275,6 @@ export const WishlistProvider = ({ children }) => {
             await api.post(`/wishlist/${product.id}`);
           } catch (error) {
             // Item might already exist, ignore error
-            console.log('Item already in wishlist or error:', error);
           }
         }
         

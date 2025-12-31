@@ -230,7 +230,9 @@ export default function ProductDetailPage() {
                     title: product.name,
                     text: product.description,
                     url: window.location.href,
-                  }).catch((error) => console.log('Error sharing', error));
+                  }).catch((error) => {
+                    // Error sharing - fallback to clipboard
+                  });
                 } else {
                   navigator.clipboard.writeText(window.location.href);
                   toast.success('Link copied to clipboard!');

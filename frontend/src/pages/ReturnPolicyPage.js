@@ -15,7 +15,7 @@ export default function ReturnPolicyPage() {
             const response = await pagesAPI.getReturnPolicy();
             if (response.data) setPage(response.data);
         } catch (error) {
-            console.log('Using default content');
+            // Using default content
         } finally {
             setLoading(false);
         }

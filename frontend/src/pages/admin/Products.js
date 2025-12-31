@@ -57,7 +57,6 @@ export default function AdminProducts() {
       // Fetch categories first independently
       try {
         const categoriesRes = await categoriesAPI.getAll();
-        console.log('Categories fetched:', categoriesRes.data);
         setCategories(categoriesRes.data || []);
       } catch (catError) {
         console.error('Failed to fetch categories:', catError);

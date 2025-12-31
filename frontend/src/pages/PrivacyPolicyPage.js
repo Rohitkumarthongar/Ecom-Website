@@ -14,7 +14,7 @@ export default function PrivacyPolicyPage() {
       const response = await pagesAPI.getPrivacyPolicy();
       if (response.data) setPage(response.data);
     } catch (error) {
-      console.log('Using default content');
+      // Using default content
     }
   };
 

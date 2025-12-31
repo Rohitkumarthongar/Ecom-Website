@@ -53,7 +53,6 @@ export const StoreHeader = () => {
   const fetchSettings = async () => {
     try {
       const response = await api.get('/settings/public');
-      console.log('Public Settings Response:', response.data);
       setSettings(response.data);
       // Update page title and favicon
       if (response.data.business_name) {

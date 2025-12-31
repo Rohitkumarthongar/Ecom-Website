@@ -28,7 +28,7 @@ export default function ContactPage() {
       const response = await api.get('/settings/public');
       setSettings(response.data);
     } catch (error) {
-      console.log('Failed to fetch settings:', error);
+      // Failed to fetch settings
     }
   };
 
