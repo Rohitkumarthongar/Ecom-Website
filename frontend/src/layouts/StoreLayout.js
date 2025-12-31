@@ -43,17 +43,16 @@ export const StoreHeader = () => {
 
   const fetchCategories = async () => {
     try {
-      const response = await categoriesAPI.getAll();
+      const response = await categoriesAPI.getTree();
       setCategories(response.data || []);
     } catch (error) {
-      console.error('Failed to fetch categories:', error);
+      // Failed to fetch categories
     }
   };
 
   const fetchSettings = async () => {
     try {
       const response = await api.get('/settings/public');
-      console.log('Public Settings Response:', response.data);
       setSettings(response.data);
       // Update page title and favicon
       if (response.data.business_name) {

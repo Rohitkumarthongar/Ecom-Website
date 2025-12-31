@@ -82,6 +82,7 @@ class CategoryCreate(BaseModel):
     name: str
     description: Optional[str] = None
     image_url: Optional[str] = None
+    parent_id: Optional[str] = None
     is_active: bool = True
 
 class BannerCreate(BaseModel):
@@ -274,11 +275,23 @@ def create_product(
     db: Session = Depends(get_db)
 ):
     """Create new product"""
-    db_product = models.Product(**product.dict())
-    db.add(db_product)
-    db.commit()
-    db.refresh(db_product)
-    return db_product
+    try:
+        # Check if SKU already exists
+        existing_product = db.query(models.Product).filter(models.Product.sku == product.sku).first()
+        if existing_product:
+            raise HTTPException(status_code=400, detail=f"Product with SKU {product.sku} already exists")
+
+        db_product = models.Product(**product.dict())
+        db.add(db_product)
+        db.commit()
+        db.refresh(db_product)
+        return db_product
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"Error creating product: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create product: {str(e)}")
 
 @router.put("/products/{product_id}")
 def update_product(
@@ -342,6 +355,12 @@ def create_category(
     db: Session = Depends(get_db)
 ):
     """Create new category"""
+    # Validate parent exists if parent_id is provided
+    if category.parent_id:
+        parent = db.query(models.Category).filter(models.Category.id == category.parent_id).first()
+        if not parent:
+            raise HTTPException(status_code=400, detail="Parent category not found")
+    
     db_category = models.Category(**category.dict())
     db.add(db_category)
     db.commit()
@@ -360,6 +379,24 @@ def update_category(
     if not db_category:
         raise HTTPException(status_code=404, detail="Category not found")
     
+    # Validate parent exists if parent_id is provided
+    if category.parent_id:
+        if category.parent_id == category_id:
+            raise HTTPException(status_code=400, detail="Category cannot be its own parent")
+        
+        parent = db.query(models.Category).filter(models.Category.id == category.parent_id).first()
+        if not parent:
+            raise HTTPException(status_code=400, detail="Parent category not found")
+        
+        # Check for circular reference
+        current = parent
+        while current.parent_id:
+            if current.parent_id == category_id:
+                raise HTTPException(status_code=400, detail="Circular reference detected")
+            current = current.parent
+            if not current:
+                break
+    
     for key, value in category.dict().items():
         setattr(db_category, key, value)
     
@@ -370,6 +407,7 @@ def update_category(
 @router.delete("/categories/{category_id}")
 def delete_category(
     category_id: str,
+    force: bool = False,
     admin: dict = Depends(admin_required),
     db: Session = Depends(get_db)
 ):
@@ -378,9 +416,68 @@ def delete_category(
     if not db_category:
         raise HTTPException(status_code=404, detail="Category not found")
     
+    # Check if category has children
+    if db_category.children and not force:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Category has {len(db_category.children)} subcategories. Use force=true to delete all."
+        )
+    
+    # Check if category has products
+    products_count = db.query(models.Product).filter(models.Product.category_id == category_id).count()
+    if products_count > 0 and not force:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Category has {products_count} products. Use force=true to delete anyway."
+        )
+    
+    if force:
+        # Delete all children recursively
+        def delete_children(category):
+            for child in category.children:
+                delete_children(child)
+                db.delete(child)
+        
+        delete_children(db_category)
+        
+        # Update products to have no category
+        db.query(models.Product).filter(models.Product.category_id == category_id).update(
+            {"category_id": None}
+        )
+    
     db.delete(db_category)
     db.commit()
     return {"message": "Category deleted"}
+
+@router.get("/categories")
+def get_admin_categories(
+    include_inactive: bool = False,
+    admin: dict = Depends(admin_required),
+    db: Session = Depends(get_db)
+):
+    """Get all categories for admin (including inactive)"""
+    query = db.query(models.Category)
+    if not include_inactive:
+        query = query.filter(models.Category.is_active == True)
+    
+    categories = query.all()
+    
+    return [
+        {
+            "id": cat.id,
+            "name": cat.name,
+            "description": cat.description,
+            "image_url": cat.image_url,
+            "parent_id": cat.parent_id,
+            "is_active": cat.is_active,
+            "created_at": cat.created_at,
+            "level": cat.level,
+            "full_path": cat.full_path,
+            "children_count": len(cat.children),
+            "products_count": len(cat.products)
+        }
+        for cat in categories
+    ]
 
 # =============== Banners (Admin) ===============
 

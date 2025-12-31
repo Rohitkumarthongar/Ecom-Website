@@ -56,11 +56,10 @@ export default function AdminProducts() {
     try {
       // Fetch categories first independently
       try {
-        const categoriesRes = await categoriesAPI.getAll();
-        console.log('Categories fetched:', categoriesRes.data);
+        const categoriesRes = await categoriesAPI.getFlat();
         setCategories(categoriesRes.data || []);
       } catch (catError) {
-        console.error('Failed to fetch categories:', catError);
+        // Failed to fetch categories
         toast.error('Failed to load categories');
       }
 
@@ -872,7 +871,9 @@ export default function AdminProducts() {
                       </SelectTrigger>
                       <SelectContent className="z-[9999] bg-slate-800 border-slate-700">
                         {categories.map((cat) => (
-                          <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                          <SelectItem key={cat.id} value={cat.id}>
+                            {'  '.repeat(cat.level)}{cat.full_path}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -1071,7 +1072,12 @@ export default function AdminProducts() {
               <p className="text-sm text-slate-400 mb-3">Use these IDs in your CSV file:</p>
               {categories.map((category) => (
                 <div key={category.id} className="flex justify-between items-center p-2 bg-slate-700/50 rounded text-sm">
-                  <span>{category.name}</span>
+                  <div>
+                    <span style={{ paddingLeft: `${category.level * 12}px` }}>
+                      {category.full_path}
+                    </span>
+                    <div className="text-xs text-slate-500">Level {category.level}</div>
+                  </div>
                   <code className="bg-slate-600 px-2 py-1 rounded text-xs">{category.id}</code>
                 </div>
               ))}

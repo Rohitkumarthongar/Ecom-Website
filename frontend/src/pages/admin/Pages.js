@@ -34,7 +34,7 @@ export default function AdminPages() {
       const contactRes = await pagesAPI.getContact();
       if (contactRes.data) setContact(contactRes.data);
     } catch (error) {
-      console.log('Using default pages');
+      // Using default pages
     }
   };
 

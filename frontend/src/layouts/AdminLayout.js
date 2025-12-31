@@ -52,7 +52,6 @@ export default function AdminLayout({ children }) {
   const fetchSettings = async () => {
     try {
       const response = await api.get('/settings/public');
-      console.log('Fetched settings:', response.data); // Debug log
       setSettings(response.data);
     } catch (error) {
       console.error('Failed to fetch settings:', error);

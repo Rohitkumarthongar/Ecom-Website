@@ -32,7 +32,14 @@ def get_products(
         query = query.filter(models.Product.is_active == True)
     
     if category_id:
-        query = query.filter(models.Product.category_id == category_id)
+        # Get category and its children for hierarchical filtering
+        category = db.query(models.Category).filter(models.Category.id == category_id).first()
+        if category:
+            descendants = category.get_all_children()
+            category_ids = [category_id] + [c.id for c in descendants]
+            query = query.filter(models.Product.category_id.in_(category_ids))
+        else:
+            query = query.filter(models.Product.category_id == category_id)
     if search:
         search_pattern = f"%{search}%"
         query = query.filter(

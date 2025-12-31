@@ -20,7 +20,50 @@ class Category(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
+    # Relationships
     products = relationship("Product", back_populates="category")
+    parent = relationship("Category", remote_side=[id], backref="children")
+    
+    @property
+    def level(self):
+        """Calculate the depth level of this category"""
+        if not self.parent_id:
+            return 0
+        level = 0
+        current = self
+        while current.parent_id:
+            level += 1
+            current = current.parent
+            if level > 10:  # Prevent infinite loops
+                break
+        return level
+    
+    @property
+    def full_path(self):
+        """Get the full path from root to this category"""
+        path = []
+        current = self
+        while current:
+            path.insert(0, current.name)
+            current = current.parent
+            if len(path) > 10:  # Prevent infinite loops
+                break
+        return " > ".join(path)
+    
+    def get_all_children(self):
+        """Get all descendant categories recursively"""
+        children = []
+        for child in self.children:
+            children.append(child)
+            children.extend(child.get_all_children())
+        return children
+    
+    def get_root_category(self):
+        """Get the root category of this hierarchy"""
+        current = self
+        while current.parent:
+            current = current.parent
+        return current
 
 
 class Product(Base):
@@ -30,6 +73,7 @@ class Product(Base):
     name = Column(String(200))
     description = Column(Text, nullable=True)
     sku = Column(String(50), unique=True, index=True)
+    barcode = Column(String(50), unique=True, nullable=True, index=True)
     category_id = Column(String(36), ForeignKey("categories.id"))
     
     mrp = Column(Float)
